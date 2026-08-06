@@ -3,6 +3,7 @@ package com.lecture.course.service;
 import com.lecture.course.dto.CourseDto;
 import com.lecture.course.entity.Course;
 import com.lecture.course.repository.CourseRepository;
+import com.lecture.course.repository.LicenseTierRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,12 +11,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class CourseService {
 
     private final CourseRepository courseRepository;
+    private final LicenseTierRepository licenseTierRepository;
 
     /**
      * 강의 등록 (강사만 가능 - SecurityConfig에서 role 검증)
@@ -98,4 +101,15 @@ public class CourseService {
         return courseRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("강의를 찾을 수 없습니다: " + id));
     }
+
+    /**
+     * 강의(디자인)별 라이선스 등급 목록 조회
+     * - 등록 API는 Should 스프린트에서 추가 예정. 오늘은 조회만 가능(빈 목록 정상)
+     */
+    public List<CourseDto.LicenseTierResponse> getLicenseTiers(Long courseId) {
+        return licenseTierRepository.findByCourseId(courseId).stream()
+                .map(CourseDto.LicenseTierResponse::from)
+                .collect(Collectors.toList());
+    }
+    
 }

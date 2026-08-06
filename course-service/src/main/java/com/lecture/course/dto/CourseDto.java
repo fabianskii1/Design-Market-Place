@@ -98,4 +98,25 @@ public class CourseDto {
         private List<CourseResponse> courses;
         private Course.Category category;
     }
+
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class LicenseTierResponse {
+        private Long id;
+        private Long courseId;
+        private com.lecture.course.entity.LicenseTier.Tier tier;
+        private BigDecimal price;
+        private String description;
+
+        public static LicenseTierResponse from(com.lecture.course.entity.LicenseTier entity) {
+            return LicenseTierResponse.builder()
+                    .id(entity.getId())
+                    .courseId(entity.getCourseId())
+                    .tier(entity.getTier())
+                    .price(entity.getPrice())
+                    .build();
+        }
+    }
 }
