@@ -2,7 +2,20 @@
   <router-link :to="`/courses/${course.id}`" class="course-card">
     <!-- 썸네일 -->
     <div class="card-thumb" :class="thumbBg">
-      <img v-if="thumbSrc" :src="thumbSrc" :alt="course.title" class="thumb-img" />
+      <!--
+        1순위: 업로드된 워터마크 미리보기
+        2순위: 카테고리 기본 이미지 (자산 미등록이거나 API 미준비 시 onerror로 전환)
+        3순위: 카테고리 첫 글자 플레이스홀더
+      -->
+      <img
+        v-if="!assetFailed"
+        :src="assetPreviewSrc"
+        :alt="course.title"
+        class="thumb-img thumb-cover"
+        loading="lazy"
+        @error="assetFailed = true"
+      />
+      <img v-else-if="thumbSrc" :src="thumbSrc" :alt="course.title" class="thumb-img" />
       <div v-else class="thumb-placeholder">{{ course.category?.charAt(0) }}</div>
     </div>
 
@@ -22,11 +35,17 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { courseApi } from '@/api/course.js'
 
 const props = defineProps({
   course: { type: Object, required: true }
 })
+
+// 업로드된 자산 미리보기. 404/500이면 onerror가 발생해 기본 이미지로 넘어간다.
+const assetFailed = ref(false)
+const assetPreviewSrc = computed(() => courseApi.previewUrl(props.course.id))
+watch(() => props.course.id, () => { assetFailed.value = false })
 
 const categoryConfig = {
   '로고 / 브랜딩':    { bg: 'thumb-teal',   badge: 'badge-teal',   thumb: 'spring_boot' },
@@ -86,6 +105,11 @@ const thumbSrc = computed(() => {
   height: 100%;
   object-fit: contain;
   padding: 16px;
+}
+/* 실제 업로드 이미지는 카드를 꽉 채운다 */
+.thumb-cover {
+  object-fit: cover;
+  padding: 0;
 }
 .thumb-placeholder {
   font-size: 36px;

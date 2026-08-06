@@ -61,6 +61,33 @@
           </router-link>
         </div>
 
+        <!-- 검색 · 정렬 -->
+        <div class="search-bar">
+          <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input
+              v-model="keyword"
+              type="search"
+              class="search-input"
+              placeholder="디자인명 또는 설명으로 검색"
+              aria-label="디자인 검색"
+            />
+            <button
+              v-if="keyword"
+              type="button"
+              class="search-clear"
+              aria-label="검색어 지우기"
+              @click="keyword = ''"
+            >×</button>
+          </div>
+
+          <select v-model="sort" class="sort-select" aria-label="정렬 기준">
+            <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">
+              {{ opt.label }}
+            </option>
+          </select>
+        </div>
+
         <!-- 필터 -->
         <div class="filter-bar">
           <button
@@ -72,6 +99,11 @@
             {{ cat }}
           </button>
         </div>
+
+        <p v-if="!loading" class="result-count">
+          총 {{ filteredCourses.length }}개
+          <span v-if="keyword" class="result-keyword">· '{{ keyword }}' 검색 결과</span>
+        </p>
 
         <!-- 로딩 -->
         <div v-if="loading" class="loading-grid">
@@ -96,7 +128,8 @@
 
         <!-- 빈 상태 -->
         <div v-else class="empty-state">
-          <p>해당 카테고리의 디자인이 없습니다.</p>
+          <p v-if="keyword">'{{ keyword }}'에 해당하는 디자인이 없습니다.</p>
+          <p v-else>해당 카테고리의 디자인이 없습니다.</p>
 
           <router-link
             v-if="isInstructor"
@@ -112,7 +145,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import CourseCard from '@/components/CourseCard.vue'
@@ -128,10 +161,55 @@ const { categories, loading } = courseStore
 const selectedCategory = computed(() => courseStore.selectedCategory)
 const isInstructor = computed(() => auth.user?.role === 'INSTRUCTOR')
 
+// 검색·정렬은 우선 프론트에서 처리한다.
+// 백엔드에 GET /api/designs?keyword=&category=&sort= 가 열리면
+// filteredCourses 대신 서버 응답을 그대로 쓰도록 바꾸면 된다.
+const keyword = ref('')
+const sort = ref('latest')
+
+const sortOptions = [
+  { value: 'latest',    label: '최신순' },
+  { value: 'popular',   label: '인기순' },
+  { value: 'priceAsc',  label: '가격 낮은순' },
+  { value: 'priceDesc', label: '가격 높은순' },
+  { value: 'title',     label: '이름순' }
+]
+
 const filteredCourses = computed(() => {
   if (!Array.isArray(courseStore.courses)) return []
-  if (selectedCategory.value === '전체') return courseStore.courses
-  return courseStore.courses.filter(c => c.category === selectedCategory.value)
+
+  let list = courseStore.courses
+
+  if (selectedCategory.value !== '전체') {
+    list = list.filter(c => c.category === selectedCategory.value)
+  }
+
+  const q = keyword.value.trim().toLowerCase()
+  if (q) {
+    list = list.filter(c =>
+      (c.title || '').toLowerCase().includes(q) ||
+      (c.description || '').toLowerCase().includes(q)
+    )
+  }
+
+  // computed가 원본 배열을 변형하지 않도록 복사 후 정렬
+  return [...list].sort((a, b) => {
+    switch (sort.value) {
+      case 'popular':
+        return (b.enrollmentCount ?? 0) - (a.enrollmentCount ?? 0)
+      case 'priceAsc':
+        return Number(a.price ?? 0) - Number(b.price ?? 0)
+      case 'priceDesc':
+        return Number(b.price ?? 0) - Number(a.price ?? 0)
+      case 'title':
+        return (a.title || '').localeCompare(b.title || '', 'ko')
+      case 'latest':
+      default:
+        // createdAt이 없으면 id 역순으로 대체
+        if (a.createdAt && b.createdAt) return b.createdAt.localeCompare(a.createdAt)
+        return (b.id ?? 0) - (a.id ?? 0)
+    }
+  })
 })
 
 function selectCategory(cat) {
@@ -149,6 +227,83 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* ── 검색 · 정렬 ───────────────────────────────── */
+.search-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.search-input-wrap {
+  position: relative;
+  flex: 1;
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding: 9px 34px 9px 34px;
+  border: 1px solid var(--color-border, #d7dbe3);
+  border-radius: var(--radius-md, 10px);
+  font-size: 14px;
+  font-family: var(--font-sans, inherit);
+  background: var(--color-bg-primary, #fff);
+  color: var(--color-text-primary, #1e2430);
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--color-primary, #2d5bd7);
+}
+
+.search-input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--color-text-muted, #8b93a3);
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.sort-select {
+  padding: 9px 12px;
+  border: 1px solid var(--color-border, #d7dbe3);
+  border-radius: var(--radius-md, 10px);
+  font-size: 14px;
+  font-family: var(--font-sans, inherit);
+  background: var(--color-bg-primary, #fff);
+  color: var(--color-text-primary, #1e2430);
+  cursor: pointer;
+}
+
+.result-count {
+  font-size: 13px;
+  color: var(--color-text-muted, #8b93a3);
+  margin: 0 0 14px;
+}
+
+.result-keyword {
+  color: var(--color-text-secondary, #5b6475);
+}
+
 .page-wrapper {
   min-height: 100vh;
   background: var(--color-bg-secondary);
