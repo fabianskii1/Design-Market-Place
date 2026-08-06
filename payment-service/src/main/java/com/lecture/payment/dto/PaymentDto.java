@@ -98,4 +98,15 @@ public class PaymentDto {
                     .build();
         }
     }
+
+    // 강의별 판매 집계 응답 (course-service 판매 대시보드용, internal 전용)
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class CourseSalesSummary {
+        private Long courseId;
+        private Long salesCount;
+        private BigDecimal totalRevenue;
+    }
 }

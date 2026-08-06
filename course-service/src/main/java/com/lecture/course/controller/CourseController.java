@@ -112,4 +112,16 @@ public class CourseController {
                 CourseDto.ApiResponse.success(courseService.getLicenseTiers(id))
         );
     }
+
+    /**
+     * GET /courses/sales/me - 판매 대시보드 (강사 본인)
+     * Gateway가 전달한 X-User-Id 헤더 사용
+     */
+    @GetMapping("/sales/me")
+    public ResponseEntity<CourseDto.ApiResponse<CourseDto.SalesDashboardResponse>> getMySales(
+            @RequestHeader("X-User-Id") Long instructorId) {
+        return ResponseEntity.ok(
+                CourseDto.ApiResponse.success(courseService.getMySales(instructorId))
+        );
+    }
 }
