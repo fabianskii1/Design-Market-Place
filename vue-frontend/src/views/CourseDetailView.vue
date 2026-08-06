@@ -14,7 +14,7 @@
             </p>
 
             <div class="detail-meta">
-              <span>강사: {{ displayInstructorName }}</span>
+              <span>디자이너: {{ displayInstructorName }}</span>
               <span>수강생: {{ displayEnrollmentCount }}명</span>
             </div>
           </div>
@@ -60,7 +60,7 @@
     </div>
 
     <div v-else class="loading-center">
-      <p class="empty-text">강의 정보를 불러오지 못했습니다.</p>
+      <p class="empty-text">디자인 정보를 불러오지 못했습니다.</p>
     </div>
   </div>
 </template>
@@ -107,7 +107,7 @@ const displayInstructorName = computed(() => {
     course.value?.instructor?.name ||
     course.value?.instructor_name ||
     course.value?.ownerName ||
-    '강사 정보 없음'
+    '디자이너 정보 없음'
   )
 })
 
@@ -137,7 +137,7 @@ const thumbSrc = computed(() => {
 })
 
 const buttonLabel = computed(() => {
-  if (isInstructor.value) return '강사 계정은 신청 불가'
+  if (isInstructor.value) return '디자이너 계정은 신청 불가'
   if (enrollmentStatus.value === 'ACTIVE') return '내 수강 목록으로 이동'
   if (enrollmentStatus.value === 'PENDING') return '신청 완료 · 결제 처리 중'
   return '결제하고 수강하기'
@@ -152,11 +152,11 @@ const buttonDisabled = computed(() => {
 
 const helperText = computed(() => {
   if (isInstructor.value) {
-    return '강사 계정은 본인 강의를 수강 신청할 수 없습니다.'
+    return '디자이너 계정은 본인 디자인을 수강 신청할 수 없습니다.'
   }
 
   if (enrollmentStatus.value === 'ACTIVE') {
-    return '이미 수강 중인 강의입니다. 내 수강 목록에서 바로 이어서 학습할 수 있습니다.'
+    return '이미 수강 중인 디자인입니다. 내 수강 목록에서 바로 이어서 학습할 수 있습니다.'
   }
 
   if (enrollmentStatus.value === 'PENDING') {
@@ -200,12 +200,12 @@ async function handlePrimaryAction() {
   enrollError.value = ''
 
   if (!course.value?.id) {
-    enrollError.value = '강의 정보가 올바르지 않습니다.'
+    enrollError.value = '디자인 정보가 올바르지 않습니다.'
     return
   }
 
   if (isInstructor.value) {
-    enrollError.value = '강사 계정은 본인 강의를 수강 신청할 수 없습니다.'
+    enrollError.value = '디자이너 계정은 본인 디자인을 수강 신청할 수 없습니다.'
     return
   }
 
