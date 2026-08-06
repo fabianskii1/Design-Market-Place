@@ -48,4 +48,13 @@ public class PaymentController {
         return ResponseEntity.ok(
                 PaymentDto.ApiResponse.success(paymentService.getPaymentsByUser(userId)));
     }
+
+    /**
+     * GET /payments/internal/sales?courseIds=1,2,3 - 강의별 판매 집계 (course-service 호출용)
+     */
+    @GetMapping("/internal/sales")
+    public ResponseEntity<List<PaymentDto.CourseSalesSummary>> getSalesSummary(
+            @RequestParam List<Long> courseIds) {
+        return ResponseEntity.ok(paymentService.getSalesSummary(courseIds));
+    }
 }

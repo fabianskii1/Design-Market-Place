@@ -3,6 +3,7 @@ package com.lecture.course.service;
 import com.lecture.course.dto.CourseDto;
 import com.lecture.course.entity.Course;
 import com.lecture.course.repository.CourseRepository;
+import com.lecture.course.repository.LicenseTierRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -10,7 +11,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +21,8 @@ import java.util.stream.Collectors;
 public class CourseService {
 
     private final CourseRepository courseRepository;
+    private final LicenseTierRepository licenseTierRepository;
+    private final PaymentServiceClient paymentServiceClient;
     private final FileStorageService fileStorageService;
 
     /**
@@ -154,4 +159,52 @@ public class CourseService {
         return courseRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("디자인을 찾을 수 없습니다: " + id));
     }
+
+    /**
+     * 강의(디자인)별 라이선스 등급 목록 조회
+     * - 등록 API는 Should 스프린트에서 추가 예정. 오늘은 조회만 가능(빈 목록 정상)
+     */
+    public List<CourseDto.LicenseTierResponse> getLicenseTiers(Long courseId) {
+        return licenseTierRepository.findByCourseId(courseId).stream()
+                .map(CourseDto.LicenseTierResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 판매 통계 조회 (마이페이지 판매 대시보드)
+     * - X-User-Id(=instructorId) 기준으로 본인 강의만 집계
+     */
+    public CourseDto.SalesDashboardResponse getMySales(Long instructorId) {
+        List<Course> myCourses = courseRepository.findByInstructorId(instructorId);
+        List<Long> courseIds = myCourses.stream().map(Course::getId).collect(Collectors.toList());
+
+        Map<Long, PaymentServiceClient.CourseSales> salesMap =
+                paymentServiceClient.getSalesSummary(courseIds);
+
+        List<CourseDto.SalesItem> items = myCourses.stream()
+                .map(course -> {
+                    PaymentServiceClient.CourseSales sales =
+                            salesMap.getOrDefault(course.getId(),
+                                    new PaymentServiceClient.CourseSales(0L, java.math.BigDecimal.ZERO));
+                    return CourseDto.SalesItem.builder()
+                            .courseId(course.getId())
+                            .title(course.getTitle())
+                            .salesCount(sales.salesCount())
+                            .revenue(sales.totalRevenue())
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        long totalCount = items.stream().mapToLong(CourseDto.SalesItem::getSalesCount).sum();
+        java.math.BigDecimal totalRevenue = items.stream()
+                .map(CourseDto.SalesItem::getRevenue)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+        return CourseDto.SalesDashboardResponse.builder()
+                .items(items)
+                .totalSalesCount(totalCount)
+                .totalRevenue(totalRevenue)
+                .build();
+    }
+
 }

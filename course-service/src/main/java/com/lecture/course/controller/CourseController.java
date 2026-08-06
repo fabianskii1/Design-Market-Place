@@ -153,4 +153,27 @@ public class CourseController {
             @RequestParam(defaultValue = "") List<Long> excludeIds) {
         return ResponseEntity.ok(courseService.getRecommendCourses(category, excludeIds));
     }
+
+    /**
+     * GET /courses/{id}/license-tiers - 라이선스 등급 목록 조회
+     */
+    @GetMapping("/{id}/license-tiers")
+    public ResponseEntity<CourseDto.ApiResponse<List<CourseDto.LicenseTierResponse>>> getLicenseTiers(
+            @PathVariable Long id) {
+        return ResponseEntity.ok(
+                CourseDto.ApiResponse.success(courseService.getLicenseTiers(id))
+        );
+    }
+
+    /**
+     * GET /courses/sales/me - 판매 대시보드 (강사 본인)
+     * Gateway가 전달한 X-User-Id 헤더 사용
+     */
+    @GetMapping("/sales/me")
+    public ResponseEntity<CourseDto.ApiResponse<CourseDto.SalesDashboardResponse>> getMySales(
+            @RequestHeader("X-User-Id") Long instructorId) {
+        return ResponseEntity.ok(
+                CourseDto.ApiResponse.success(courseService.getMySales(instructorId))
+        );
+    }
 }

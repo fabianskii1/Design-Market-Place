@@ -104,4 +104,20 @@ public class PaymentService {
                 .map(PaymentDto.PaymentResponse::from)
                 .collect(Collectors.toList());
     }
+
+    /**
+     * 강의 ID 목록으로 판매 집계 조회 (course-service 판매 통계용, internal)
+     */
+    public List<PaymentDto.CourseSalesSummary> getSalesSummary(List<Long> courseIds) {
+        if (courseIds == null || courseIds.isEmpty()) {
+            return List.of();
+        }
+        return paymentRepository.findSalesSummaryByCourseIds(courseIds).stream()
+                .map(p -> PaymentDto.CourseSalesSummary.builder()
+                        .courseId(p.getCourseId())
+                        .salesCount(p.getSalesCount())
+                        .totalRevenue(p.getTotalRevenue())
+                        .build())
+                .collect(Collectors.toList());
+    }
 }

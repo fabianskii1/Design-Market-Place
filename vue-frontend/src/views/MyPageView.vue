@@ -38,8 +38,8 @@
           <div class="profile-info">
             <h2 class="profile-name">{{ auth.user?.name || '사용자' }}</h2>
             <p class="profile-email">{{ auth.user?.email || '-' }}</p>
-            <span class="badge" :class="isInstructor ? 'badge-amber' : 'badge-blue'">
-              {{ isInstructor ? '강사' : '학생' }}
+            <span v-if="isInstructor" class="badge badge-amber">
+              디자이너
             </span>
           </div>
         </div>
@@ -78,86 +78,98 @@
         <!-- 강사 화면 -->
         <section v-else class="instructor-section">
           <div class="section-head">
-            <h3 class="section-title">내가 등록한 디자인</h3>
-            <span class="section-subtitle">등록한 디자인과 디자인별 구매자 수를 확인할 수 있습니다.</span>
+            <h3 class="section-title">마이페이지</h3>
+            <span class="section-subtitle">디자인 현황과 매출을 관리할 수 있습니다.</span>
           </div>
 
-          <div class="summary-cards">
-            <div class="summary-card">
-              <div class="summary-label">등록 디자인 수</div>
-              <div class="summary-value">{{ myCourses.length }}</div>
-            </div>
-            <div class="summary-card">
-              <div class="summary-label">총 구매자 수</div>
-              <div class="summary-value">{{ totalEnrollmentCount }}</div>
-            </div>
+          <div class="tab-nav">
+            <button
+              class="tab-btn"
+              :class="{ active: activeTab === 'courses' }"
+              @click="activeTab = 'courses'"
+            >내 디자인</button>
+            <button
+              class="tab-btn"
+              :class="{ active: activeTab === 'sales' }"
+              @click="activeTab = 'sales'"
+            >판매 현황</button>
           </div>
 
-          <div v-if="instructorLoading" class="loading-row instructor-loading">
-            <div v-for="i in 3" :key="i" class="skeleton-card">
-              <div class="skeleton-thumb"></div>
-              <div class="skeleton-body">
-                <div class="skeleton-line short"></div>
-                <div class="skeleton-line"></div>
+          <template v-if="activeTab === 'courses'">
+            <div class="summary-cards">
+              <div class="summary-card">
+                <div class="summary-label">등록 디자인 수</div>
+                <div class="summary-value">{{ myCourses.length }}</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">총 구매자 수</div>
+                <div class="summary-value">{{ totalEnrollmentCount }}</div>
               </div>
             </div>
-          </div>
 
-          <div v-else-if="myCourses.length" class="instructor-course-list fade-in">
-            <div
-              v-for="course in myCourses"
-              :key="course.id"
-              class="instructor-course-card"
-            >
-              <div class="course-card-top">
-                <div>
-                  <h4 class="course-title">{{ course.title }}</h4>
-                  <p class="course-desc">{{ course.description || '설명이 없습니다.' }}</p>
+            <div v-if="instructorLoading" class="loading-row instructor-loading">
+              <div v-for="i in 3" :key="i" class="skeleton-card">
+                <div class="skeleton-thumb"></div>
+                <div class="skeleton-body">
+                  <div class="skeleton-line short"></div>
+                  <div class="skeleton-line"></div>
                 </div>
-                <span
-                  class="status-badge"
-                  :class="course.status === 'ACTIVE' ? 'status-active' : 'status-inactive'"
-                >
-                  {{ course.status || 'UNKNOWN' }}
-                </span>
               </div>
+            </div>
 
-              <div class="course-meta-grid">
-                <div class="meta-box">
-                  <div class="meta-label">카테고리</div>
-                  <div class="meta-value">{{ course.category || '-' }}</div>
+            <div v-else-if="myCourses.length" class="instructor-course-list fade-in">
+              <div
+                v-for="course in myCourses"
+                :key="course.id"
+                class="instructor-course-card"
+              >
+                <div class="course-card-top">
+                  <div>
+                    <h4 class="course-title">{{ course.title }}</h4>
+                    <p class="course-desc">{{ course.description || '설명이 없습니다.' }}</p>
+                  </div>
+                  <span
+                    class="status-badge"
+                    :class="course.status === 'ACTIVE' ? 'status-active' : 'status-inactive'"
+                  >
+                    {{ course.status || 'UNKNOWN' }}
+                  </span>
                 </div>
-                <div class="meta-box">
-                  <div class="meta-label">가격</div>
-                  <div class="meta-value">{{ formatPrice(course.price) }}</div>
-                </div>
-                <div class="meta-box">
-                  <div class="meta-label">구매자 수</div>
-                  <div class="meta-value">
-                    {{ course.enrollment_count ?? course.enrollmentCount ?? 0 }}명
+
+                <div class="course-meta-grid">
+                  <div class="meta-box">
+                    <div class="meta-label">카테고리</div>
+                    <div class="meta-value">{{ course.category || '-' }}</div>
+                  </div>
+                  <div class="meta-box">
+                    <div class="meta-label">가격</div>
+                    <div class="meta-value">{{ formatPrice(course.price) }}</div>
+                  </div>
+                  <div class="meta-box">
+                    <div class="meta-label">구매자 수</div>
+                    <div class="meta-value">
+                      {{ course.enrollment_count ?? course.enrollmentCount ?? 0 }}명
+                    </div>
+                  </div>
+                  <div class="meta-box">
+                    <div class="meta-label">디자인 ID</div>
+                    <div class="meta-value">#{{ course.id }}</div>
                   </div>
                 </div>
-                <div class="meta-box">
-                  <div class="meta-label">디자인 ID</div>
-                  <div class="meta-value">#{{ course.id }}</div>
+
+                <div class="course-card-actions">
+                  <router-link :to="`/courses/${course.id}`" class="action-btn action-primary">
+                    디자인 보기
+                  </router-link>
                 </div>
               </div>
-
-              <div class="course-card-actions">
-                <router-link :to="`/courses/${course.id}`" class="action-btn action-primary">
-                  디자인 보기
-                </router-link>
-              </div>
             </div>
-          </div>
 
-          <p v-else-if="instructorError" class="empty-text">
-            {{ instructorError }}
-          </p>
+            <p v-else-if="instructorError" class="empty-text">{{ instructorError }}</p>
+            <p v-else class="empty-text">아직 등록한 디자인이 없습니다.</p>
+          </template>
 
-          <p v-else class="empty-text">
-            아직 등록한 디자인이 없습니다.
-          </p>
+          <SalesTab v-else-if="activeTab === 'sales'" />
         </section>
       </main>
     </div>
@@ -172,6 +184,7 @@ import CourseCard from '@/components/CourseCard.vue'
 import { useAuthStore } from '@/store/auth.js'
 import { enrollmentApi } from '@/api/enrollment.js'
 import { courseApi } from '@/api/course.js'
+import SalesTab from '@/components/SalesTab.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -188,6 +201,7 @@ const recommendMessage = ref('')
 const myCourses = ref([])
 const instructorLoading = ref(true)
 const instructorError = ref('')
+const activeTab = ref('courses') // 'courses' | 'sales'
 
 const totalEnrollmentCount = computed(() =>
   myCourses.value.reduce((sum, course) => {
@@ -475,6 +489,36 @@ onMounted(async () => {
   flex-direction: column;
   gap: 6px;
   margin-bottom: 12px;
+}
+
+.tab-nav {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tab-btn {
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: var(--transition);
+}
+
+.tab-btn:hover {
+  color: var(--color-text-primary);
+}
+
+.tab-btn.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+  font-weight: 600;
 }
 
 .section-title {
