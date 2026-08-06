@@ -26,7 +26,8 @@ public class EnrollmentService {
     private final PaymentServiceClient paymentServiceClient;
     private final EnrollmentKafkaProducer kafkaProducer;
     private final EnrollmentWriteService enrollmentWriteService;
-
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
     /**
      * 수강신청 전체 흐름
      * 1. 강의 존재 확인
@@ -35,21 +36,24 @@ public class EnrollmentService {
      * 4. 결제 요청
      */
     public EnrollmentDto.EnrollmentResponse enroll(Long userId, Long courseId) {
-        if (!courseServiceClient.existsCourse(courseId)) {
-            throw new IllegalArgumentException("존재하지 않는 강의입니다: " + courseId);
-        }
-
-        if (enrollmentRepository.existsByUserIdAndCourseId(userId, courseId)) {
-            throw new IllegalArgumentException("이미 수강신청한 강의입니다");
-        }
-
-        Enrollment enrollment = enrollmentWriteService.createPendingEnrollment(userId, courseId);
-
-        paymentServiceClient.requestPayment(userId, courseId, BigDecimal.valueOf(99000));
-
-        log.info("[EnrollmentService] 수강신청 완료 (결제 대기) - enrollmentId: {}", enrollment.getId());
-        return EnrollmentDto.EnrollmentResponse.from(enrollment);
+    if (!courseServiceClient.existsCourse(courseId)) {
+        throw new IllegalArgumentException("존재하지 않는 디자인입니다: " + courseId);
     }
+
+    if (enrollmentRepository.existsByUserIdAndCourseId(userId, courseId)) {
+        throw new IllegalArgumentException("이미 구매한 디자인입니다");
+    }
+
+    Enrollment enrollment = enrollmentWriteService.createPendingEnrollment(userId, courseId);
+
+    BigDecimal price = courseServiceClient.getCoursePrice(courseId);
+    paymentServiceClient.requestPayment(userId, courseId, price);
+
+    log.info("[EnrollmentService] 구매 신청 완료 (결제 대기) - enrollmentId: {}", enrollment.getId());
+    return EnrollmentDto.EnrollmentResponse.from(enrollment);
+    }
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
 
     /**
      * 수강 활성화

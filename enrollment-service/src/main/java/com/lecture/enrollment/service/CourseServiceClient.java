@@ -87,6 +87,22 @@ public class CourseServiceClient {
             throw new RuntimeException("Course Service 강의 상세 조회 실패");
         }
     }
+    //////////////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////////////
+    /**
+     * Course Service: 강의 가격 조회 (수강신청 시 실제 결제 금액 산정용)
+     */
+    public java.math.BigDecimal getCoursePrice(Long courseId) {
+        Map<String, Object> course = getCourse(courseId);
+        Object priceObj = course.get("price");
+        if (priceObj == null) {
+            throw new RuntimeException("Course Service 응답에 price 필드가 없습니다. courseId: " + courseId);
+        }
+        return new java.math.BigDecimal(priceObj.toString());
+    }
+    //////////////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////////////
+
 
     /**
      * Course Service: 수강생 수 증가 (수강 활성화 시 호출)
