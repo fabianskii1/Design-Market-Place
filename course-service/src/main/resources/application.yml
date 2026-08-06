@@ -12,12 +12,6 @@ spring:
     password: SqlDba-1
     driver-class-name: org.mariadb.jdbc.Driver
 
-  servlet:
-    multipart:
-      enabled: true
-      max-file-size: 10MB
-      max-request-size: 12MB
-
   jpa:
     hibernate:
       ddl-auto: update
@@ -45,8 +39,6 @@ eureka:
 service:
   user-service:
     url: http://user-service
-  enrollment-service:
-    url: http://enrollment-service:8083
 
 springdoc:
   api-docs:

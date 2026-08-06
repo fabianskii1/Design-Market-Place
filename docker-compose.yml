@@ -9,8 +9,6 @@ services:
   mariadb:
     image: mariadb:11.2
     container_name: lecturedb
-    # 이미지 바이너리(LONGBLOB)를 주고받으므로 기본 16MB로는 부족할 수 있다
-    command: ["--max_allowed_packet=67108864"]
     environment:
       MYSQL_ROOT_PASSWORD: SqlDba-1
       MYSQL_DATABASE: lecture_db
