@@ -239,13 +239,13 @@ async function loadStudentRecommendations() {
   try {
     if (!auth.user) {
       console.warn('[MyPage] auth.user is missing')
-      recommendError.value = '추천 강의를 준비 중입니다.'
+      recommendError.value = '추천 디자인을 준비 중입니다.'
       return
     }
 
     if (!auth.user.id) {
       console.warn('[MyPage] auth.user.id is missing:', auth.user)
-      recommendError.value = '추천 강의를 준비 중입니다.'
+      recommendError.value = '추천 디자인을 준비 중입니다.'
       return
     }
 
@@ -270,7 +270,7 @@ async function loadStudentRecommendations() {
     }
   } catch (error) {
     console.error('[MyPage] failed to load recommendations:', error)
-    recommendError.value = '현재 추천 강의를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
+    recommendError.value = '현재 추천 디자인을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
   } finally {
     recommendLoading.value = false
   }
@@ -280,13 +280,13 @@ async function loadInstructorCourses() {
   try {
     if (!auth.user) {
       console.warn('[MyPage] instructor auth.user is missing')
-      instructorError.value = '강좌 정보를 불러오지 못했습니다.'
+      instructorError.value = '디자인 정보를 불러오지 못했습니다.'
       return
     }
 
     if (!auth.user.id) {
       console.warn('[MyPage] instructor auth.user.id is missing:', auth.user)
-      instructorError.value = '강좌 정보를 불러오지 못했습니다.'
+      instructorError.value = '디자인 정보를 불러오지 못했습니다.'
       return
     }
 
@@ -329,7 +329,7 @@ async function loadInstructorCourses() {
     console.log('[MyPage] filtered myCourses =', myCourses.value)
   } catch (error) {
     console.error('[MyPage] failed to load instructor courses:', error)
-    instructorError.value = '현재 강좌 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
+    instructorError.value = '현재 디자인 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
   } finally {
     instructorLoading.value = false
   }

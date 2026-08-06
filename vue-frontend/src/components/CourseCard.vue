@@ -2,7 +2,22 @@
   <router-link :to="`/courses/${course.id}`" class="course-card">
     <!-- 썸네일 -->
     <div class="card-thumb" :class="thumbBg">
-      <img v-if="thumbSrc" :src="thumbSrc" :alt="course.title" class="thumb-img" />
+      <!--
+        1순위: 업로드된 디자인 이미지 (blob으로 받아온 objectURL)
+        2순위: 카테고리 기본 이미지
+        3순위: 카테고리 첫 글자 플레이스홀더
+      -->
+      <div v-if="assetLoading" class="thumb-skeleton"></div>
+
+      <img
+        v-else-if="assetSrc"
+        :src="assetSrc"
+        :alt="course.title"
+        class="thumb-img thumb-cover"
+      />
+
+      <img v-else-if="thumbSrc" :src="thumbSrc" :alt="course.title" class="thumb-img" />
+
       <div v-else class="thumb-placeholder">{{ course.category?.charAt(0) }}</div>
     </div>
 
@@ -15,7 +30,7 @@
         <span class="price">₩{{ Number(course.price).toLocaleString() }}</span>
       </div>
       <div class="card-footer">
-        <span class="enrolled">수강생 {{ course.enrollmentCount?.toLocaleString() }}명</span>
+        <span class="enrolled">구매 {{ course.enrollmentCount?.toLocaleString() }}명</span>
       </div>
     </div>
   </router-link>
@@ -23,24 +38,32 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useAssetImage } from '@/composables/useAssetImage.js'
 
 const props = defineProps({
   course: { type: Object, required: true }
 })
 
+// 업로드된 이미지는 인증이 필요하므로 axios로 받아 objectURL로 표시한다.
+// hasAsset이 false면 아예 요청하지 않아 불필요한 401/404가 나지 않는다.
+const { src: assetSrc, loading: assetLoading } = useAssetImage(
+  computed(() => props.course.id),
+  computed(() => props.course.hasAsset)
+)
+
 const categoryConfig = {
-  '로고 / 브랜딩':    { bg: 'thumb-teal',   badge: 'badge-teal',   thumb: 'spring_boot' },
-  'UX / UI 키트':{ bg: 'thumb-teal',   badge: 'badge-teal',   thumb: 'vue_js' },
-  '일러스트':   { bg: 'thumb-blue',   badge: 'badge-blue',   thumb: 'docker' },
-  '아이콘':   { bg: 'thumb-purple', badge: 'badge-purple', thumb: 'python' },
-  '템플릿':       { bg: 'thumb-pink',   badge: 'badge-pink',   thumb: 'generative_ai' },
+  '로고 / 브랜딩': { bg: 'thumb-teal',   badge: 'badge-teal',   thumb: 'spring_boot' },
+  'UX / UI 키트':  { bg: 'thumb-teal',   badge: 'badge-teal',   thumb: 'vue_js' },
+  '일러스트':      { bg: 'thumb-blue',   badge: 'badge-blue',   thumb: 'docker' },
+  '아이콘':        { bg: 'thumb-purple', badge: 'badge-purple', thumb: 'python' },
+  '템플릿':        { bg: 'thumb-pink',   badge: 'badge-pink',   thumb: 'generative_ai' },
 }
 
 const config = computed(() => categoryConfig[props.course.category] || { bg: 'thumb-gray', badge: 'badge-gray' })
 const thumbBg = computed(() => config.value.bg)
 const badgeClass = computed(() => config.value.badge)
 
-// 썸네일 이미지 동적 import
+// 카테고리 기본 썸네일
 const thumbSrc = computed(() => {
   const key = props.course.thumbnail || config.value.thumb
   if (!key) return null
@@ -87,10 +110,27 @@ const thumbSrc = computed(() => {
   object-fit: contain;
   padding: 16px;
 }
+/* 실제 업로드 이미지는 카드를 꽉 채운다 */
+.thumb-cover {
+  object-fit: cover;
+  padding: 0;
+}
 .thumb-placeholder {
   font-size: 36px;
   font-weight: 700;
   color: var(--color-text-muted);
+}
+/* 이미지 로딩 중 깜빡임 방지 */
+.thumb-skeleton {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(0,0,0,0.04) 25%, rgba(0,0,0,0.08) 37%, rgba(0,0,0,0.04) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0%   { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
 }
 .card-body {
   padding: 14px 16px;

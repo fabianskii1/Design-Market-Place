@@ -57,3 +57,4 @@ CREATE TABLE IF NOT EXISTS payments (
     FOREIGN KEY (user_id)   REFERENCES users(id),
     FOREIGN KEY (course_id) REFERENCES courses(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
