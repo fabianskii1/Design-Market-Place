@@ -119,4 +119,27 @@ public class CourseDto {
                     .build();
         }
     }
+
+    // 판매 대시보드: 강의 1건 판매 정보
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class SalesItem {
+        private Long courseId;
+        private String title;
+        private Long salesCount;
+        private BigDecimal revenue;
+    }
+
+    // 판매 대시보드: 전체 응답
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class SalesDashboardResponse {
+        private List<SalesItem> items;
+        private Long totalSalesCount;
+        private BigDecimal totalRevenue;
+    }
 }
