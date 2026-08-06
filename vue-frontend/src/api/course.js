@@ -22,16 +22,13 @@ export const courseApi = {
   },
 
   // ── 디자인 자산 (이미지) ────────────────────────────────
-  // 백엔드 계약: POST /api/designs/{id}/asset (multipart, 필드명 file)
-  // Gateway 라우팅이 /api/courses/** 로 고정되어 있어 현재는 courses 경로로 호출한다.
-  // 백엔드에서 /api/designs 라우트가 열리면 아래 상수만 바꾸면 된다.
+
   uploadAsset(designId, file, onProgress) {
     const formData = new FormData()
     formData.append('file', file)
 
     return api.post(`/api/courses/${designId}/asset`, formData, {
       // FormData 전송 시 Content-Type을 비워야 axios가 boundary를 자동으로 붙인다.
-      // 인스턴스 기본값(application/json)이 남으면 서버가 본문을 파싱하지 못한다.
       headers: { 'Content-Type': undefined },
       timeout: 120000,
       onUploadProgress(event) {
@@ -41,12 +38,21 @@ export const courseApi = {
     })
   },
 
-  /** 워터마크 미리보기 이미지 URL (인증 불필요 — img src에 그대로 사용) */
-  previewUrl(designId) {
-    return `/api/courses/${designId}/asset/preview`
+  /**
+   * 미리보기 이미지를 blob 으로 받아온다.
+   *
+   * img 태그의 src 로 직접 URL을 넣으면 브라우저가 요청을 보내면서
+   * Authorization 헤더를 붙이지 않아 게이트웨이에서 401이 난다.
+   * axios 로 받아 objectURL 을 만들어 쓰면 인터셉터가 토큰을 붙여준다.
+   */
+  fetchPreview(designId) {
+    return api.get(`/api/courses/${designId}/asset/preview`, {
+      responseType: 'blob',
+      timeout: 30000
+    })
   },
 
-  /** 워터마크본 다운로드 (인증 필요 — blob으로 받아 사용) */
+  /** 워터마크본 다운로드 */
   downloadAsset(designId) {
     return api.get(`/api/courses/${designId}/asset/download`, {
       responseType: 'blob',

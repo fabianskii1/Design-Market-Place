@@ -1,17 +1,55 @@
+<template>
+  <router-link :to="`/courses/${course.id}`" class="course-card">
+    <!-- 썸네일 -->
+    <div class="card-thumb" :class="thumbBg">
+      <!--
+        1순위: 업로드된 디자인 이미지 (blob으로 받아온 objectURL)
+        2순위: 카테고리 기본 이미지
+        3순위: 카테고리 첫 글자 플레이스홀더
+      -->
+      <div v-if="assetLoading" class="thumb-skeleton"></div>
+
+      <img
+        v-else-if="assetSrc"
+        :src="assetSrc"
+        :alt="course.title"
+        class="thumb-img thumb-cover"
+      />
+
+      <img v-else-if="thumbSrc" :src="thumbSrc" :alt="course.title" class="thumb-img" />
+
+      <div v-else class="thumb-placeholder">{{ course.category?.charAt(0) }}</div>
+    </div>
+
+    <!-- 내용 -->
+    <div class="card-body">
+      <span class="badge" :class="badgeClass">{{ course.category }}</span>
+      <h3 class="card-title">{{ course.title }}</h3>
+      <div class="card-meta">
+        <span class="instructor">{{ course.instructorName }}</span>
+        <span class="price">₩{{ Number(course.price).toLocaleString() }}</span>
+      </div>
+      <div class="card-footer">
+        <span class="enrolled">구매 {{ course.enrollmentCount?.toLocaleString() }}명</span>
+      </div>
+    </div>
+  </router-link>
+</template>
+
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
+import { useAssetImage } from '@/composables/useAssetImage.js'
 
 const props = defineProps({
   course: { type: Object, required: true }
 })
 
-// 백엔드가 내려준 thumbnailUrl 을 그대로 쓴다.
-// hasAsset 이 false 면 아예 요청하지 않으므로 불필요한 404가 나지 않는다.
-const assetFailed = ref(false)
-const assetPreviewSrc = computed(() =>
-  props.course.hasAsset ? props.course.thumbnailUrl : null
+// 업로드된 이미지는 인증이 필요하므로 axios로 받아 objectURL로 표시한다.
+// hasAsset이 false면 아예 요청하지 않아 불필요한 401/404가 나지 않는다.
+const { src: assetSrc, loading: assetLoading } = useAssetImage(
+  computed(() => props.course.id),
+  computed(() => props.course.hasAsset)
 )
-watch(() => props.course.id, () => { assetFailed.value = false })
 
 const categoryConfig = {
   '로고 / 브랜딩': { bg: 'thumb-teal',   badge: 'badge-teal',   thumb: 'spring_boot' },
@@ -25,7 +63,7 @@ const config = computed(() => categoryConfig[props.course.category] || { bg: 'th
 const thumbBg = computed(() => config.value.bg)
 const badgeClass = computed(() => config.value.badge)
 
-// 썸네일 이미지 동적 import
+// 카테고리 기본 썸네일
 const thumbSrc = computed(() => {
   const key = props.course.thumbnail || config.value.thumb
   if (!key) return null
@@ -36,3 +74,96 @@ const thumbSrc = computed(() => {
   }
 })
 </script>
+
+<style scoped>
+.course-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: var(--transition);
+  cursor: pointer;
+}
+.course-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-hover);
+}
+.card-thumb {
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.thumb-teal   { background: #E1F5EE; }
+.thumb-blue   { background: #E6F1FB; }
+.thumb-amber  { background: #FAEEDA; }
+.thumb-purple { background: #EEEDFE; }
+.thumb-pink   { background: #FBEAF0; }
+.thumb-gray   { background: #F1EFE8; }
+.thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 16px;
+}
+/* 실제 업로드 이미지는 카드를 꽉 채운다 */
+.thumb-cover {
+  object-fit: cover;
+  padding: 0;
+}
+.thumb-placeholder {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+/* 이미지 로딩 중 깜빡임 방지 */
+.thumb-skeleton {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(0,0,0,0.04) 25%, rgba(0,0,0,0.08) 37%, rgba(0,0,0,0.04) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0%   { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+.card-body {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1.4;
+}
+.card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.instructor {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.price {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+.card-footer {
+  margin-top: 2px;
+}
+.enrolled {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+</style>
