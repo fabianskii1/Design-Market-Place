@@ -90,20 +90,8 @@ async function loadSales() {
     const res = await salesApi.getMySales()
     console.log('[SalesTab] sales response:', res.data)
 
-    const payload = res.data
-    let rawList = []
-
-    if (Array.isArray(payload?.data)) {
-      rawList = payload.data
-    } else if (Array.isArray(payload?.sales)) {
-      rawList = payload.sales
-    } else if (Array.isArray(payload)) {
-      rawList = payload
-    } else {
-      console.warn('[SalesTab] unexpected sales response shape:', payload)
-    }
-
-    sales.value = rawList.map(normalizeSalesItem)
+    const items = res.data?.data?.items ?? []
+    sales.value = items.map(normalizeSalesItem)
   } catch (err) {
     console.error('[SalesTab] failed to load sales:', err)
     error.value = '판매 현황을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
