@@ -38,8 +38,8 @@
           <div class="profile-info">
             <h2 class="profile-name">{{ auth.user?.name || '사용자' }}</h2>
             <p class="profile-email">{{ auth.user?.email || '-' }}</p>
-            <span class="badge" :class="isInstructor ? 'badge-amber' : 'badge-blue'">
-              {{ isInstructor ? '강사' : '학생' }}
+            <span v-if="isInstructor" class="badge badge-amber">
+              디자이너
             </span>
           </div>
         </div>
