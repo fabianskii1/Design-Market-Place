@@ -14,7 +14,7 @@
             </p>
 
             <div class="detail-meta">
-              <span>강사: {{ displayInstructorName }}</span>
+              <span>디자이너: {{ displayInstructorName }}</span>
               <span>수강생: {{ displayEnrollmentCount }}명</span>
             </div>
           </div>
@@ -22,8 +22,16 @@
           <!-- 우측 결제/수강 카드 -->
           <div class="enroll-card fade-in">
             <div class="enroll-thumb" :class="thumbBg">
-              <img v-if="thumbSrc" :src="thumbSrc" :alt="course.title" />
+              <img
+                v-if="!assetFailed"
+                :src="assetPreviewSrc"
+                :alt="course.title"
+                class="asset-preview"
+                @error="assetFailed = true"
+              />
+              <img v-else-if="thumbSrc" :src="thumbSrc" :alt="course.title" />
             </div>
+            <p v-if="!assetFailed" class="watermark-note">워터마크가 적용된 미리보기입니다.</p>
 
             <div class="enroll-body">
               <div class="enroll-price">₩{{ displayPrice }}</div>
@@ -44,10 +52,51 @@
                 {{ helperText }}
               </p>
 
+              <!-- 구매자·소유자 다운로드 -->
+              <button
+                v-if="canDownload"
+                type="button"
+                class="btn btn-outline btn-full asset-btn"
+                :disabled="downloading"
+                @click="handleDownload"
+              >
+                <span v-if="downloading">내려받는 중...</span>
+                <span v-else>원본 다운로드</span>
+              </button>
+
+              <!-- 소유자 파일 업로드 / 교체 -->
+              <div v-if="isOwner" class="owner-upload">
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-full asset-btn"
+                  :disabled="uploading"
+                  @click="openFilePicker"
+                >
+                  <span v-if="uploading">업로드 중 {{ uploadProgress }}%</span>
+                  <span v-else>{{ assetFailed ? '디자인 파일 업로드' : '파일 교체' }}</span>
+                </button>
+
+                <input
+                  ref="fileInput"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  class="file-input-hidden"
+                  @change="handleFileChange"
+                />
+
+                <div v-if="uploading" class="progress">
+                  <div class="progress-bar" :style="{ width: uploadProgress + '%' }"></div>
+                </div>
+              </div>
+
+              <p v-if="assetMessage" class="asset-msg" :class="{ 'is-error': assetIsError }">
+                {{ assetMessage }}
+              </p>
+
               <ul class="enroll-info-list">
-                <li>✅ 즉시 수강 가능</li>
-                <li>✅ 평생 소장</li>
-                <li>✅ 수료증 발급</li>
+                <li>✅ 즉시 다운로드</li>
+                <li>✅ 영구 이용</li>
+                <li>✅ 라이선스 증빙 제공</li>
               </ul>
             </div>
           </div>
@@ -60,17 +109,18 @@
     </div>
 
     <div v-else class="loading-center">
-      <p class="empty-text">강의 정보를 불러오지 못했습니다.</p>
+      <p class="empty-text">디자인 정보를 불러오지 못했습니다.</p>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import { useCourseStore } from '@/store/course.js'
 import { enrollmentApi } from '@/api/enrollment.js'
+import { courseApi } from '@/api/course.js'
 import { useAuthStore } from '@/store/auth.js'
 
 const route = useRoute()
@@ -80,6 +130,15 @@ const auth = useAuthStore()
 
 const enrolling = ref(false)
 const enrollError = ref('')
+
+// ── 디자인 자산 (미리보기 · 업로드 · 다운로드) ──────────────
+const assetFailed = ref(false)
+const fileInput = ref(null)
+const uploading = ref(false)
+const uploadProgress = ref(0)
+const downloading = ref(false)
+const assetMessage = ref('')
+const assetIsError = ref(false)
 const enrollmentStatus = ref('NONE') // NONE | PENDING | ACTIVE
 
 const course = computed(() => courseStore.selectedCourse)
@@ -107,7 +166,7 @@ const displayInstructorName = computed(() => {
     course.value?.instructor?.name ||
     course.value?.instructor_name ||
     course.value?.ownerName ||
-    '강사 정보 없음'
+    '디자이너 정보 없음'
   )
 })
 
@@ -125,6 +184,104 @@ const displayPrice = computed(() => {
   return Number.isNaN(value) ? '0' : value.toLocaleString()
 })
 
+const assetPreviewSrc = computed(() =>
+  course.value?.id ? courseApi.previewUrl(course.value.id) : ''
+)
+
+const isOwner = computed(() => {
+  const ownerId = course.value?.instructorId ?? course.value?.instructor_id
+  return !!ownerId && Number(ownerId) === Number(auth.user?.id)
+})
+
+// 소유자이거나 구매가 완료된 사용자만 원본을 받을 수 있다
+const canDownload = computed(() =>
+  !assetFailed.value && (isOwner.value || enrollmentStatus.value === 'ACTIVE')
+)
+
+function openFilePicker() {
+  fileInput.value?.click()
+}
+
+async function handleFileChange(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file) return
+
+  assetMessage.value = ''
+  assetIsError.value = false
+
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+    assetIsError.value = true
+    assetMessage.value = 'PNG, JPG, WEBP 형식만 업로드할 수 있습니다.'
+    return
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    assetIsError.value = true
+    assetMessage.value = '파일 크기는 10MB를 넘을 수 없습니다.'
+    return
+  }
+
+  uploading.value = true
+  uploadProgress.value = 0
+
+  try {
+    await courseApi.uploadAsset(course.value.id, file, (percent) => {
+      uploadProgress.value = percent
+    })
+    assetMessage.value = '파일이 업로드되었습니다.'
+    // 캐시된 이전 미리보기를 무시하도록 강제로 다시 그린다
+    assetFailed.value = true
+    await nextTick()
+    assetFailed.value = false
+  } catch (e) {
+    console.error('[CourseDetail] asset upload failed:', e)
+    assetIsError.value = true
+    const status = e.response?.status
+    assetMessage.value = (status === 404 || status === 405)
+      ? '파일 업로드 API가 아직 준비되지 않았습니다.'
+      : (e.response?.data?.message || '파일 업로드에 실패했습니다.')
+  } finally {
+    uploading.value = false
+  }
+}
+
+async function handleDownload() {
+  assetMessage.value = ''
+  assetIsError.value = false
+  downloading.value = true
+
+  try {
+    const res = await courseApi.downloadAsset(course.value.id)
+
+    // Content-Disposition에 담긴 파일명을 우선 사용한다
+    const disposition = res.headers?.['content-disposition'] || ''
+    const match = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i)
+    const filename = match
+      ? decodeURIComponent(match[1])
+      : `design_${course.value.id}.png`
+
+    const url = URL.createObjectURL(res.data)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    console.error('[CourseDetail] asset download failed:', e)
+    assetIsError.value = true
+    const status = e.response?.status
+    assetMessage.value = status === 403
+      ? '구매한 사용자만 원본을 내려받을 수 있습니다.'
+      : (status === 404 || status === 405)
+        ? '다운로드 API가 아직 준비되지 않았습니다.'
+        : '다운로드에 실패했습니다.'
+  } finally {
+    downloading.value = false
+  }
+}
+
 const thumbSrc = computed(() => {
   const key = course.value?.thumbnail || config.value.thumb
   if (!key) return null
@@ -137,7 +294,7 @@ const thumbSrc = computed(() => {
 })
 
 const buttonLabel = computed(() => {
-  if (isInstructor.value) return '강사 계정은 신청 불가'
+  if (isInstructor.value) return '디자이너 계정은 신청 불가'
   if (enrollmentStatus.value === 'ACTIVE') return '내 수강 목록으로 이동'
   if (enrollmentStatus.value === 'PENDING') return '신청 완료 · 결제 처리 중'
   return '결제하고 수강하기'
@@ -152,11 +309,11 @@ const buttonDisabled = computed(() => {
 
 const helperText = computed(() => {
   if (isInstructor.value) {
-    return '강사 계정은 본인 강의를 수강 신청할 수 없습니다.'
+    return '디자이너 계정은 본인 디자인을 수강 신청할 수 없습니다.'
   }
 
   if (enrollmentStatus.value === 'ACTIVE') {
-    return '이미 수강 중인 강의입니다. 내 수강 목록에서 바로 이어서 학습할 수 있습니다.'
+    return '이미 수강 중인 디자인입니다. 내 수강 목록에서 바로 이어서 학습할 수 있습니다.'
   }
 
   if (enrollmentStatus.value === 'PENDING') {
@@ -200,12 +357,12 @@ async function handlePrimaryAction() {
   enrollError.value = ''
 
   if (!course.value?.id) {
-    enrollError.value = '강의 정보가 올바르지 않습니다.'
+    enrollError.value = '디자인 정보가 올바르지 않습니다.'
     return
   }
 
   if (isInstructor.value) {
-    enrollError.value = '강사 계정은 본인 강의를 수강 신청할 수 없습니다.'
+    enrollError.value = '디자이너 계정은 본인 디자인을 수강 신청할 수 없습니다.'
     return
   }
 
@@ -242,6 +399,8 @@ watch(
   async (value) => {
     console.log('[CourseDetail] selectedCourse changed =', value)
     if (value?.id) {
+      assetFailed.value = false
+      assetMessage.value = ''
       await loadEnrollmentStatus()
     }
   },
@@ -250,6 +409,52 @@ watch(
 </script>
 
 <style scoped>
+/* ── 디자인 자산 ───────────────────────────────── */
+.asset-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.watermark-note {
+  font-size: 11px;
+  color: var(--color-text-muted, #8b93a3);
+  text-align: center;
+  margin: 6px 0 0;
+}
+
+.asset-btn {
+  margin-top: 8px;
+}
+
+.file-input-hidden {
+  display: none;
+}
+
+.progress {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--color-bg-tertiary, #eef2fb);
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--color-primary, #2d5bd7);
+  transition: width 0.2s ease;
+}
+
+.asset-msg {
+  font-size: 12px;
+  color: var(--color-text-secondary, #5b6475);
+  margin: 10px 0 0;
+}
+
+.asset-msg.is-error {
+  color: var(--color-danger, #d64545);
+}
+
 .page-wrapper {
   min-height: 100vh;
   background: var(--color-bg-secondary);

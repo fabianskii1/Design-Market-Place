@@ -4,8 +4,10 @@ import com.lecture.course.dto.CourseDto;
 import com.lecture.course.entity.Course;
 import com.lecture.course.repository.CourseRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -16,9 +18,10 @@ import java.util.stream.Collectors;
 public class CourseService {
 
     private final CourseRepository courseRepository;
+    private final FileStorageService fileStorageService;
 
     /**
-     * 강의 등록 (강사만 가능 - SecurityConfig에서 role 검증)
+     * 디자인 등록 (디자이너만 가능 - SecurityConfig에서 role 검증)
      */
     @Transactional
     public CourseDto.CourseResponse createCourse(CourseDto.CreateRequest request, Long instructorId) {
@@ -34,7 +37,60 @@ public class CourseService {
     }
 
     /**
-     * 강의 단건 조회
+     * 디자인 자산(이미지) 업로드.
+     *
+     * 등록과 분리한 이유: multipart 와 JSON 을 한 요청에 섞으면
+     * 프론트·게이트웨이 양쪽에서 다루기가 까다로워진다.
+     * 등록이 성공한 뒤 파일만 따로 올리고, 실패하면 상세 화면에서 재시도한다.
+     *
+     * @param instructorId 요청자. 본인 디자인이 아니면 거부한다.
+     */
+    @Transactional
+    public CourseDto.CourseResponse uploadAsset(Long courseId, MultipartFile file, Long instructorId) {
+        Course course = findCourseById(courseId);
+
+        if (!course.getInstructorId().equals(instructorId)) {
+            throw new IllegalArgumentException("본인이 등록한 디자인만 파일을 올릴 수 있습니다.");
+        }
+
+        // 교체 업로드면 이전 파일을 정리한다
+        String previous = course.getOriginalUrl();
+
+        String storedName = fileStorageService.store(courseId, file);
+
+        // 워터마크 처리는 아직 없으므로 원본을 썸네일로도 사용한다.
+        // watermark-service 가 붙으면 thumbnailUrl 을 워터마크본으로 교체한다.
+        course.updateAssets(storedName, storedName);
+
+        if (previous != null && !previous.equals(storedName)) {
+            fileStorageService.deleteQuietly(previous);
+        }
+
+        return CourseDto.CourseResponse.from(course);
+    }
+
+    /**
+     * 미리보기용 파일 로드.
+     * 저장된 파일명은 DB에만 있으므로 courseId 로 조회해서 꺼낸다.
+     */
+    public Resource loadAsset(Long courseId) {
+        Course course = findCourseById(courseId);
+        String storedName = course.getOriginalUrl();
+
+        if (storedName == null || storedName.isBlank()) {
+            throw new IllegalArgumentException("등록된 파일이 없습니다: " + courseId);
+        }
+        return fileStorageService.load(storedName);
+    }
+
+    /** 응답 헤더용 Content-Type */
+    public String assetContentType(Long courseId) {
+        Course course = findCourseById(courseId);
+        return fileStorageService.contentTypeOf(course.getOriginalUrl());
+    }
+
+    /**
+     * 디자인 단건 조회
      */
     public CourseDto.CourseResponse getCourse(Long id) {
         Course course = findCourseById(id);
@@ -42,7 +98,7 @@ public class CourseService {
     }
 
     /**
-     * 전체 활성 강의 목록 조회
+     * 전체 활성 디자인 목록 조회
      */
     public List<CourseDto.CourseResponse> getAllCourses() {
         return courseRepository.findByStatus(Course.Status.ACTIVE).stream()
@@ -51,7 +107,7 @@ public class CourseService {
     }
 
     /**
-     * 카테고리별 강의 조회
+     * 카테고리별 디자인 조회
      */
     public List<CourseDto.CourseResponse> getCoursesByCategory(Course.Category category) {
         return courseRepository.findByCategoryAndStatus(category, Course.Status.ACTIVE).stream()
@@ -60,14 +116,14 @@ public class CourseService {
     }
 
     /**
-     * 강의 존재 여부 확인 (Enrollment Service → Course Service REST 호출용)
+     * 디자인 존재 여부 확인 (Enrollment Service → Course Service REST 호출용)
      */
     public boolean existsCourse(Long id) {
         return courseRepository.existsById(id);
     }
 
     /**
-     * 수강생 수 증가 (Enrollment Service 수강 활성화 시 호출)
+     * 구매자 수 증가 (Enrollment Service 구매 활성화 시 호출)
      */
     @Transactional
     public void increaseEnrollmentCount(Long courseId) {
@@ -76,8 +132,8 @@ public class CourseService {
     }
 
     /**
-     * 추천 서비스용: 카테고리별 미수강 강의 조회
-     * - excludeCourseIds: 이미 수강한 강의 ID 목록
+     * 추천 서비스용: 카테고리별 미구매 디자인 조회
+     * - excludeCourseIds: 이미 구매한 디자인 ID 목록
      */
     public List<CourseDto.CourseResponse> getRecommendCourses(
             Course.Category category, List<Long> excludeCourseIds) {
@@ -87,7 +143,7 @@ public class CourseService {
                 : courseRepository.findByCategoryAndStatusAndIdNotIn(
                         category, Course.Status.ACTIVE, excludeCourseIds);
 
-        // 수강생 수 기준 내림차순 정렬
+        // 구매자 수 기준 내림차순 정렬
         return courses.stream()
                 .sorted((a, b) -> b.getEnrollmentCount() - a.getEnrollmentCount())
                 .map(CourseDto.CourseResponse::from)
@@ -96,6 +152,6 @@ public class CourseService {
 
     private Course findCourseById(Long id) {
         return courseRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("강의를 찾을 수 없습니다: " + id));
+                .orElseThrow(() -> new IllegalArgumentException("디자인을 찾을 수 없습니다: " + id));
     }
 }

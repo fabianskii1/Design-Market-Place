@@ -5,9 +5,13 @@ import com.lecture.course.entity.Course;
 import com.lecture.course.service.CourseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -19,8 +23,8 @@ public class CourseController {
     private final CourseService courseService;
 
     /**
-     * POST /courses - 강의 등록 (강사만)
-     * Gateway에서 전달한 X-User-Id 헤더로 강사 ID 추출
+     * POST /courses - 디자인 등록 (디자이너만)
+     * Gateway에서 전달한 X-User-Id 헤더로 디자이너 ID 추출
      */
     @PostMapping
     public ResponseEntity<CourseDto.ApiResponse<CourseDto.CourseResponse>> createCourse(
@@ -32,8 +36,59 @@ public class CourseController {
                 .body(CourseDto.ApiResponse.success(response));
     }
 
+    // ── 디자인 자산 (이미지) ────────────────────────────────
+
     /**
-     * GET /courses - 전체 강의 목록
+     * POST /courses/{id}/asset - 디자인 이미지 업로드
+     *
+     * multipart/form-data, 필드명 file.
+     * 응답으로 갱신된 CourseResponse 를 돌려주므로 프론트가 곧바로
+     * originalUrl / thumbnailUrl 을 받아 화면에 반영할 수 있다.
+     */
+    @PostMapping(value = "/{id}/asset", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<CourseDto.ApiResponse<CourseDto.CourseResponse>> uploadAsset(
+            @PathVariable Long id,
+            @RequestPart("file") MultipartFile file,
+            @RequestHeader("X-User-Id") Long instructorId) {
+
+        CourseDto.CourseResponse response = courseService.uploadAsset(id, file, instructorId);
+        return ResponseEntity.ok(CourseDto.ApiResponse.success(response));
+    }
+
+    /**
+     * GET /courses/{id}/asset/preview - 이미지 바이너리 응답
+     *
+     * img 태그의 src 로 직접 쓰이므로 인증 헤더 없이 접근 가능해야 한다.
+     * 래퍼 없이 바이트를 그대로 내려준다.
+     */
+    @GetMapping("/{id}/asset/preview")
+    public ResponseEntity<Resource> previewAsset(@PathVariable Long id) {
+        Resource resource = courseService.loadAsset(id);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(courseService.assetContentType(id)))
+                .header(HttpHeaders.CACHE_CONTROL, "max-age=3600")
+                .body(resource);
+    }
+
+    /**
+     * GET /courses/{id}/asset/download - 파일 다운로드
+     */
+    @GetMapping("/{id}/asset/download")
+    public ResponseEntity<Resource> downloadAsset(@PathVariable Long id) {
+        Resource resource = courseService.loadAsset(id);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + resource.getFilename() + "\"")
+                .body(resource);
+    }
+
+    // ──────────────────────────────────────────────────────
+
+    /**
+     * GET /courses - 전체 디자인 목록
      */
     @GetMapping
     public ResponseEntity<CourseDto.ApiResponse<List<CourseDto.CourseResponse>>> getAllCourses() {
@@ -43,7 +98,7 @@ public class CourseController {
     }
 
     /**
-     * GET /courses/{id} - 강의 상세
+     * GET /courses/{id} - 디자인 상세
      */
     @GetMapping("/{id}")
     public ResponseEntity<CourseDto.ApiResponse<CourseDto.CourseResponse>> getCourse(
@@ -54,7 +109,7 @@ public class CourseController {
     }
 
     /**
-     * GET /courses/category/{category} - 카테고리별 강의
+     * GET /courses/category/{category} - 카테고리별 디자인
      */
     @GetMapping("/category/{category}")
     public ResponseEntity<CourseDto.ApiResponse<List<CourseDto.CourseResponse>>> getCoursesByCategory(
@@ -65,7 +120,7 @@ public class CourseController {
     }
 
     /**
-     * GET /courses/internal/exists/{id} - 강의 존재 여부 (Enrollment Service 호출)
+     * GET /courses/internal/exists/{id} - 디자인 존재 여부 (Enrollment Service 호출)
      */
     @GetMapping("/internal/exists/{id}")
     public ResponseEntity<Boolean> existsCourse(@PathVariable Long id) {
@@ -73,9 +128,7 @@ public class CourseController {
     }
 
     /**
-     * GET /courses/internal/{id} - 강의 상세 조회 (Enrollment Service 내부 호출용)
-     * - 내 수강 목록 응답 조립 시 사용
-     * - 래퍼 없이 CourseResponse만 직접 반환
+     * GET /courses/internal/{id} - 디자인 상세 조회 (Enrollment Service 내부 호출용)
      */
     @GetMapping("/internal/{id}")
     public ResponseEntity<CourseDto.CourseResponse> getCourseInternal(@PathVariable Long id) {
@@ -83,7 +136,7 @@ public class CourseController {
     }
 
     /**
-     * POST /courses/internal/{id}/enrollment-count - 수강생 수 증가 (Enrollment Service 호출)
+     * POST /courses/internal/{id}/enrollment-count - 구매자 수 증가 (Enrollment Service 호출)
      */
     @PostMapping("/internal/{id}/enrollment-count")
     public ResponseEntity<Void> increaseEnrollmentCount(@PathVariable Long id) {
@@ -92,8 +145,7 @@ public class CourseController {
     }
 
     /**
-     * GET /courses/internal/recommend - 추천 서비스용 미수강 강의 조회
-     * category: 카테고리, excludeIds: 이미 수강한 강의 ID 목록
+     * GET /courses/internal/recommend - 추천 서비스용 미구매 디자인 조회
      */
     @GetMapping("/internal/recommend")
     public ResponseEntity<List<CourseDto.CourseResponse>> getRecommendCourses(

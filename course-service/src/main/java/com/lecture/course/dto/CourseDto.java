@@ -12,14 +12,14 @@ import java.util.List;
 
 public class CourseDto {
 
-    // 강의 등록 요청
+    // 디자인 등록 요청
     @Getter
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
     public static class CreateRequest {
 
-        @NotBlank(message = "강의 제목은 필수입니다")
+        @NotBlank(message = "디자인명은 필수입니다")
         private String title;
 
         private String description;
@@ -32,7 +32,7 @@ public class CourseDto {
         private BigDecimal price;
     }
 
-    // 강의 응답
+    // 디자인 응답
     @Getter
     @NoArgsConstructor
     @AllArgsConstructor
@@ -48,7 +48,22 @@ public class CourseDto {
         private Course.Status status;
         private LocalDateTime createdAt;
 
+        /**
+         * 프론트가 img src 에 그대로 쓸 수 있는 경로.
+         * DB에는 저장 파일명만 두고, 노출은 API 경로로 감싼다.
+         * 저장 위치를 S3로 옮겨도 프론트 코드는 바뀌지 않는다.
+         */
+        private String thumbnailUrl;
+
+        /** 자산 등록 여부. 프론트가 기본 이미지로 넘길지 판단한다. */
+        private Boolean hasAsset;
+
+        private Integer downloadCount;
+
         public static CourseResponse from(Course course) {
+            boolean hasAsset = course.getOriginalUrl() != null
+                    && !course.getOriginalUrl().isBlank();
+
             return CourseResponse.builder()
                     .id(course.getId())
                     .title(course.getTitle())
@@ -59,6 +74,11 @@ public class CourseDto {
                     .enrollmentCount(course.getEnrollmentCount())
                     .status(course.getStatus())
                     .createdAt(course.getCreatedAt())
+                    .thumbnailUrl(hasAsset
+                            ? "/api/courses/" + course.getId() + "/asset/preview"
+                            : null)
+                    .hasAsset(hasAsset)
+                    .downloadCount(course.getDownloadCount())
                     .build();
         }
     }
@@ -89,7 +109,7 @@ public class CourseDto {
         }
     }
 
-    // 추천 서비스용 응답 (카테고리 기반 미수강 강의 목록)
+    // 추천 서비스용 응답 (카테고리 기반 미구매 디자인 목록)
     @Getter
     @NoArgsConstructor
     @AllArgsConstructor
