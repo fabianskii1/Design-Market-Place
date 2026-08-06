@@ -57,3 +57,26 @@ CREATE TABLE IF NOT EXISTS payments (
     FOREIGN KEY (user_id)   REFERENCES users(id),
     FOREIGN KEY (course_id) REFERENCES courses(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 디자인 자산 (원본 이미지 바이너리 + 워터마크본)
+-- course_id → courses.id (1:1). FK 없이 ID만 보관 — 서비스별 DB 분리를 고려
+CREATE TABLE IF NOT EXISTS design_assets (
+    id                BIGINT        NOT NULL AUTO_INCREMENT,
+    course_id         BIGINT        NOT NULL,
+    owner_id          BIGINT        NOT NULL,
+    asset_token       VARCHAR(36)   NOT NULL COMMENT '워터마크에 삽입되는 추적용 UUID',
+    original_filename VARCHAR(255)  NOT NULL,
+    content_type      VARCHAR(100)  NOT NULL,
+    width             INT           NOT NULL,
+    height            INT           NOT NULL,
+    file_size         BIGINT        NOT NULL,
+    checksum          VARCHAR(64)   NOT NULL COMMENT '워터마크본의 SHA-256',
+    watermark_payload VARCHAR(255)  NOT NULL,
+    watermarked_data  LONGBLOB      NOT NULL COMMENT 'LSB 워터마크 삽입된 판매본 (PNG)',
+    preview_data      LONGBLOB      NOT NULL COMMENT '가시적 워터마크 미리보기 (PNG)',
+    download_count    BIGINT        NOT NULL DEFAULT 0,
+    created_at        DATETIME(6),
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_design_asset_course (course_id),
+    KEY idx_design_asset_token (asset_token)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
