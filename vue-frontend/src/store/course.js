@@ -114,7 +114,6 @@ export const useCourseStore = defineStore('course', () => {
     categories,
     selectedCategory,
     thumbnailMap,
-    categoryLabelMap,
     normalizeCategory,
     normalizeCourse,
     getThumbnail,

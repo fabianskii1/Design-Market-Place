@@ -118,7 +118,7 @@
                 v-model.trim="form.title"
                 type="text"
                 class="form-input"
-                placeholder="예: Cloud Native App기반 Web Service 개발"
+                placeholder="예: 미니멀 로고 세트"
                 maxlength="100"
               />
             </div>
@@ -138,18 +138,18 @@
 
               <div class="form-row">
                 <div class="form-group">
-                  <label class="form-label" for="category">카테고리</label>
-                  <select id="category" v-model="form.category" class="form-select">
-                    <option disabled value="">카테고리를 선택하세요</option>
-                    <option
-                      v-for="option in categoryOptions"
-                      :key="option.value"
-                      :value="option.value"
-                    >
-                      {{ option.label }}
-                    </option>
-                  </select>
-                </div>
+                <label class="form-label" for="category">카테고리</label>
+                <select id="category" v-model="form.category" class="form-select">
+                  <option disabled value="">카테고리를 선택하세요</option>
+                  <option
+                    v-for="option in categoryOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
+              </div>
 
                 <div class="form-group">
                   <label class="form-label" for="price">가격</label>
@@ -187,6 +187,9 @@
                     />
                   </div>
                 </div>
+                <p class="field-hint" v-if="derivedPrice">
+                  목록에는 라이선스 중 가장 낮은 가격(₩{{ derivedPrice.toLocaleString() }})이 대표 가격으로 표시됩니다.
+                </p>
               </div>
             </div>
 
@@ -235,13 +238,19 @@ const auth = useAuthStore()
 const form = reactive({
   title: '',
   description: '',
-  category: '',
-  price: null
+  category: ''
 })
 const licensePrices = reactive({
   PERSONAL: null,
   COMMERCIAL_SMALL: null,
   COMMERCIAL_LARGE: null
+})
+
+const derivedPrice = computed(() => {
+  const values = Object.values(licensePrices)
+    .map(Number)
+    .filter(v => !Number.isNaN(v) && v > 0)
+  return values.length ? Math.min(...values) : 0
 })
 
 const submitting = ref(false)
@@ -374,14 +383,15 @@ function validateForm() {
     return false
   }
 
-  if (form.price === null || form.price === undefined || form.price === '') {
-    validationError.value = '가격을 입력해 주세요.'
+  const tierValues = Object.values(licensePrices)
+
+  if (tierValues.some(v => v === null || v === undefined || v === '')) {
+    validationError.value = '라이선스별 가격을 모두 입력해 주세요.'
     return false
   }
 
-  const price = Number(form.price)
-  if (Number.isNaN(price) || price < 0) {
-    validationError.value = '가격은 0 이상의 숫자로 입력해 주세요.'
+  if (tierValues.some(v => Number.isNaN(Number(v)) || Number(v) < 0)) {
+    validationError.value = '라이선스별 가격은 0 이상의 숫자로 입력해 주세요.'
     return false
   }
 
@@ -401,7 +411,7 @@ async function handleSubmit() {
       title: form.title,
       description: form.description,
       category: form.category,
-      price: Number(form.price)
+      price: derivedPrice.value
     }
 
     const res = await courseApi.create(payload)
