@@ -21,6 +21,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.math.BigDecimal;
 
 
 @Slf4j
@@ -322,5 +323,141 @@ public class CourseService {
     private Course findCourseById(Long id) {
         return courseRepository.findById(id)
                 .orElseThrow(() -> new AssetNotFoundException("디자인을 찾을 수 없습니다: " + id));
+    }
+
+    /**
+     * 강의(디자인)별 라이선스 등급 목록 조회
+     * - 등록 API는 Should 스프린트에서 추가 예정. 오늘은 조회만 가능(빈 목록 정상)
+     */
+    public List<CourseDto.LicenseTierResponse> getLicenseTiers(Long courseId) {
+        return licenseTierRepository.findByCourseId(courseId).stream()
+                .map(CourseDto.LicenseTierResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 판매 통계 조회 (마이페이지 판매 대시보드)
+     * - X-User-Id(=instructorId) 기준으로 본인 강의만 집계
+     */
+    public CourseDto.SalesDashboardResponse getMySales(Long instructorId) {
+        List<Course> myCourses = courseRepository.findByInstructorId(instructorId);
+        List<Long> courseIds = myCourses.stream().map(Course::getId).collect(Collectors.toList());
+
+        Map<Long, PaymentServiceClient.CourseSales> salesMap =
+                paymentServiceClient.getSalesSummary(courseIds);
+
+        // courseId -> 그 강의의 등급별 판매 목록 (salesByLicense 계산용)
+        Map<Long, List<PaymentServiceClient.LicenseTierSales>> licenseSalesByCourse =
+                paymentServiceClient.getLicenseTierSales(courseIds).stream()
+                        .collect(Collectors.groupingBy(PaymentServiceClient.LicenseTierSales::courseId));
+
+        List<CourseDto.SalesItem> items = myCourses.stream()
+                .map(course -> {
+                    PaymentServiceClient.CourseSales sales =
+                            salesMap.getOrDefault(course.getId(),
+                                    new PaymentServiceClient.CourseSales(0L, java.math.BigDecimal.ZERO));
+
+                    List<CourseDto.LicenseSalesBreakdown> salesByLicense =
+                            licenseSalesByCourse.getOrDefault(course.getId(), List.of()).stream()
+                                    .map(lt -> {
+                                        com.lecture.course.entity.LicenseTier.Tier tierEnum =
+                                                lt.licenseTierId() == null ? null :
+                                                        licenseTierRepository.findById(lt.licenseTierId())
+                                                                .map(com.lecture.course.entity.LicenseTier::getTier)
+                                                                .orElse(null);
+                                        return CourseDto.LicenseSalesBreakdown.builder()
+                                                .tier(tierEnum)
+                                                .count(lt.salesCount())
+                                                .revenue(lt.revenue())
+                                                .build();
+                                    })
+                                    .filter(b -> b.getTier() != null)
+                                    .collect(Collectors.toList());
+
+                    return CourseDto.SalesItem.builder()
+                            .courseId(course.getId())
+                            .title(course.getTitle())
+                            .salesCount(sales.salesCount())
+                            .revenue(sales.totalRevenue())
+                            .salesByLicense(salesByLicense)
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        long totalCount = items.stream().mapToLong(CourseDto.SalesItem::getSalesCount).sum();
+        java.math.BigDecimal totalRevenue = items.stream()
+                .map(CourseDto.SalesItem::getRevenue)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+        // 월별 매출 합산: 여러 강의의 같은 달을 하나로 합친다.
+        // yearMonth는 payment-service가 이미 "YYYY-MM"로 내려주므로 그대로 month에 쓴다.
+        Map<String, CourseDto.MonthlyBreakdownItem> monthlyMap = new java.util.TreeMap<>();
+        for (PaymentServiceClient.MonthlySales m : paymentServiceClient.getMonthlySales(courseIds)) {
+            monthlyMap.merge(m.yearMonth(),
+                    CourseDto.MonthlyBreakdownItem.builder()
+                            .month(m.yearMonth())
+                            .revenue(m.revenue())
+                            .salesCount(m.salesCount())
+                            .build(),
+                    (a, b) -> CourseDto.MonthlyBreakdownItem.builder()
+                            .month(a.getMonth())
+                            .revenue(a.getRevenue().add(b.getRevenue()))
+                            .salesCount(a.getSalesCount() + b.getSalesCount())
+                            .build());
+        }
+
+        Long subscriberCount = paymentServiceClient.getSubscriberCount(instructorId);
+
+        return CourseDto.SalesDashboardResponse.builder()
+                .items(items)
+                .totalSalesCount(totalCount)
+                .totalRevenue(totalRevenue)
+                .monthlyBreakdown(new java.util.ArrayList<>(monthlyMap.values()))
+                .subscriberCount(subscriberCount)
+                .build();
+    }
+
+
+    @Transactional
+    public List<CourseDto.LicenseTierResponse> registerLicenseTiers(
+            Long courseId, CourseDto.LicenseTierRegisterRequest request, Long instructorId) {
+
+        Course course = findCourseById(courseId);
+        if (!course.getInstructorId().equals(instructorId)) {
+            throw new IllegalArgumentException("본인이 등록한 디자인만 라이선스 등급을 설정할 수 있습니다.");
+        }
+
+        List<com.lecture.course.entity.LicenseTier> saved = request.getTiers().stream()
+                .map(tp -> licenseTierRepository.findByCourseIdAndTier(courseId, tp.getTier())
+                        .map(existing -> com.lecture.course.entity.LicenseTier.builder()
+                                .id(existing.getId())
+                                .courseId(courseId)
+                                .tier(tp.getTier())
+                                .price(tp.getPrice())
+                                .build())
+                        .orElse(com.lecture.course.entity.LicenseTier.builder()
+                                .courseId(courseId)
+                                .tier(tp.getTier())
+                                .price(tp.getPrice())
+                                .build()))
+                .map(licenseTierRepository::save)
+                .collect(Collectors.toList());
+
+        BigDecimal lowestPrice = saved.stream()
+                .map(com.lecture.course.entity.LicenseTier::getPrice)
+                .min(BigDecimal::compareTo)
+                .orElse(course.getPrice());
+        course.updateRepresentativePrice(lowestPrice);
+
+        return saved.stream()
+                .map(CourseDto.LicenseTierResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    public CourseDto.LicenseTierResponse getLicenseTier(Long courseId, Long tierId) {
+        com.lecture.course.entity.LicenseTier tier = licenseTierRepository.findById(tierId)
+                .filter(t -> t.getCourseId().equals(courseId))
+                .orElseThrow(() -> new IllegalArgumentException("라이선스 등급을 찾을 수 없습니다: " + tierId));
+        return CourseDto.LicenseTierResponse.from(tier);
     }
 }

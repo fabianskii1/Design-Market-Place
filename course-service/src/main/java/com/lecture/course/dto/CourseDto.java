@@ -5,6 +5,8 @@ import com.lecture.course.entity.LicenseTier;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -213,5 +215,102 @@ public class CourseDto {
     public static class RecommendResponse {
         private List<CourseResponse> courses;
         private Course.Category category;
+    }
+
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class LicenseTierResponse {
+        private Long id;
+        private Long courseId;
+        private com.lecture.course.entity.LicenseTier.Tier tier;
+        private BigDecimal price;
+        private String description;
+
+        public static LicenseTierResponse from(com.lecture.course.entity.LicenseTier entity) {
+            return LicenseTierResponse.builder()
+                    .id(entity.getId())
+                    .courseId(entity.getCourseId())
+                    .tier(entity.getTier())
+                    .price(entity.getPrice())
+                    .build();
+        }
+    }
+
+    // 판매 대시보드: 강의 1건 판매 정보
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class SalesItem {
+        private Long courseId;
+        private String title;
+        private Long salesCount;
+        private BigDecimal revenue;
+
+        /** 이 강의의 라이선스 등급별 판매 집계. 프론트가 item.salesByLicense.find(l => l.tier === tier)로 매칭한다. */
+        private List<LicenseSalesBreakdown> salesByLicense;
+    }
+
+    // 판매 대시보드: 강의 1건 안에서의 등급별 판매 집계 (salesByLicense 배열의 원소)
+    // 필드명 고정: tier / count / revenue — 프론트 코드가 이 이름으로 직접 읽는다.
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class LicenseSalesBreakdown {
+        private com.lecture.course.entity.LicenseTier.Tier tier; // PERSONAL | COMMERCIAL_SMALL | COMMERCIAL_LARGE
+        private Long count;
+        private BigDecimal revenue;
+    }
+
+    // 판매 대시보드: 월별 매출 (monthlyBreakdown 배열의 원소)
+    // 필드명 고정: month("YYYY-MM") / revenue — 프론트가 이 두 필드만 읽는다. salesCount는 안 써도 되지만 넣어둔다(무해).
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class MonthlyBreakdownItem {
+        private String month;
+        private BigDecimal revenue;
+        private Long salesCount;
+    }
+
+    // 판매 대시보드: 전체 응답
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class SalesDashboardResponse {
+        private List<SalesItem> items;
+        private Long totalSalesCount;
+        private BigDecimal totalRevenue;
+        private List<MonthlyBreakdownItem> monthlyBreakdown;
+        private Long subscriberCount;
+    }
+
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class LicenseTierRegisterRequest {
+        @NotNull
+        @Size(min = 1, message = "최소 1개 이상의 등급을 등록해야 합니다")
+        @Valid
+        private List<TierPrice> tiers;
+
+        @Getter
+        @NoArgsConstructor
+        @AllArgsConstructor
+        @Builder
+        public static class TierPrice {
+            @NotNull(message = "등급은 필수입니다")
+            private com.lecture.course.entity.LicenseTier.Tier tier;
+
+            @NotNull(message = "가격은 필수입니다")
+            @PositiveOrZero(message = "가격은 0 이상이어야 합니다")
+            private BigDecimal price;
+        }
     }
 }

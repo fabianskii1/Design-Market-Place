@@ -4,6 +4,7 @@ import com.lecture.enrollment.entity.Enrollment;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -15,8 +16,11 @@ public class EnrollmentDto {
     @AllArgsConstructor
     @Builder
     public static class EnrollRequest {
-        @NotNull(message = "강의 ID는 필수입니다")
-        private Long courseId;
+    @NotNull(message = "강의 ID는 필수입니다")
+    private Long courseId;
+
+    @NotNull(message = "라이선스 등급 ID는 필수입니다")
+    private Long licenseTier;   // JSON 필드명 = licenseTier (프론트 계약에 맞춤), 값은 license_tiers.id
     }
 
     // 강의 요약 정보 (내 수강 목록 표시용)
@@ -46,6 +50,8 @@ public class EnrollmentDto {
         private Long courseId;
         private Enrollment.Status status;
         private LocalDateTime createdAt;
+        private Long licenseTierId;
+        private BigDecimal paidAmount;
 
         // 추가
         private CourseSummary course;
@@ -57,6 +63,8 @@ public class EnrollmentDto {
                     .courseId(enrollment.getCourseId())
                     .status(enrollment.getStatus())
                     .createdAt(enrollment.getCreatedAt())
+                    .licenseTierId(enrollment.getLicenseTierId())
+                    .paidAmount(enrollment.getPaidAmount())
                     .build();
         }
 
@@ -67,6 +75,8 @@ public class EnrollmentDto {
                     .courseId(enrollment.getCourseId())
                     .status(enrollment.getStatus())
                     .createdAt(enrollment.getCreatedAt())
+                    .licenseTierId(enrollment.getLicenseTierId())
+                    .paidAmount(enrollment.getPaidAmount())
                     .course(course)
                     .build();
         }
@@ -107,4 +117,6 @@ public class EnrollmentDto {
                     .build();
         }
     }
+
+    
 }
