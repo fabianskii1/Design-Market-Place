@@ -28,8 +28,7 @@ export const courseApi = {
     formData.append('file', file)
 
     return api.post(`/api/courses/${designId}/asset`, formData, {
-      // FormData 전송 시 Content-Type을 비워야 axios가 boundary를 자동으로 붙인다.
-      headers: { 'Content-Type': undefined },
+      // Content-Type은 index.js 인터셉터가 제거한다 (브라우저가 boundary를 붙이도록)
       timeout: 120000,
       onUploadProgress(event) {
         if (!onProgress || !event.total) return

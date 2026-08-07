@@ -15,7 +15,7 @@ services:
       MYSQL_USER: manager
       MYSQL_PASSWORD: SqlDba-1
     ports:
-      - "3379:3306"
+      - "3380:3306"
     volumes:
       - mariadb_data:/var/lib/mysql
       - ./init-db:/docker-entrypoint-initdb.d

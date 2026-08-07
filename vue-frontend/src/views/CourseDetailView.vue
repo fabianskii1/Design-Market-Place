@@ -22,16 +22,16 @@
           <!-- 우측 결제/수강 카드 -->
           <div class="enroll-card fade-in">
             <div class="enroll-thumb" :class="thumbBg">
+              <div v-if="assetLoading" class="thumb-skeleton"></div>
               <img
-                v-if="!assetFailed"
-                :src="assetPreviewSrc"
+                v-else-if="assetSrc"
+                :src="assetSrc"
                 :alt="course.title"
                 class="asset-preview"
-                @error="assetFailed = true"
               />
               <img v-else-if="thumbSrc" :src="thumbSrc" :alt="course.title" />
             </div>
-            <p v-if="!assetFailed" class="watermark-note">워터마크가 적용된 미리보기입니다.</p>
+            <p v-if="assetSrc" class="watermark-note">워터마크가 적용된 미리보기입니다.</p>
 
             <div class="enroll-body">
               <div class="enroll-price">₩{{ displayPrice }}</div>
@@ -73,7 +73,7 @@
                   @click="openFilePicker"
                 >
                   <span v-if="uploading">업로드 중 {{ uploadProgress }}%</span>
-                  <span v-else>{{ assetFailed ? '디자인 파일 업로드' : '파일 교체' }}</span>
+                  <span v-else>{{ assetSrc ? '파일 교체' : '디자인 파일 업로드' }}</span>
                 </button>
 
                 <input
@@ -115,12 +115,13 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import { useCourseStore } from '@/store/course.js'
 import { enrollmentApi } from '@/api/enrollment.js'
 import { courseApi } from '@/api/course.js'
+import { useAssetImage, invalidateAssetCache } from '@/composables/useAssetImage.js'
 import { useAuthStore } from '@/store/auth.js'
 
 const route = useRoute()
@@ -132,7 +133,6 @@ const enrolling = ref(false)
 const enrollError = ref('')
 
 // ── 디자인 자산 (미리보기 · 업로드 · 다운로드) ──────────────
-const assetFailed = ref(false)
 const fileInput = ref(null)
 const uploading = ref(false)
 const uploadProgress = ref(0)
@@ -184,8 +184,10 @@ const displayPrice = computed(() => {
   return Number.isNaN(value) ? '0' : value.toLocaleString()
 })
 
-const assetPreviewSrc = computed(() =>
-  course.value?.id ? courseApi.previewUrl(course.value.id) : ''
+// 미리보기는 인증이 필요해 blob으로 받아온다 (CourseCard와 동일한 방식)
+const { src: assetSrc, loading: assetLoading } = useAssetImage(
+  computed(() => course.value?.id),
+  computed(() => course.value?.hasAsset ?? false)
 )
 
 const isOwner = computed(() => {
@@ -195,7 +197,7 @@ const isOwner = computed(() => {
 
 // 소유자이거나 구매가 완료된 사용자만 원본을 받을 수 있다
 const canDownload = computed(() =>
-  !assetFailed.value && (isOwner.value || enrollmentStatus.value === 'ACTIVE')
+  !!assetSrc.value && (isOwner.value || enrollmentStatus.value === 'ACTIVE')
 )
 
 function openFilePicker() {
@@ -229,10 +231,9 @@ async function handleFileChange(event) {
       uploadProgress.value = percent
     })
     assetMessage.value = '파일이 업로드되었습니다.'
-    // 캐시된 이전 미리보기를 무시하도록 강제로 다시 그린다
-    assetFailed.value = true
-    await nextTick()
-    assetFailed.value = false
+    // 캐시된 이전 미리보기를 버리고 갱신된 course(hasAsset)를 다시 받아온다
+    invalidateAssetCache(course.value.id)
+    await courseStore.fetchCourse(course.value.id)
   } catch (e) {
     console.error('[CourseDetail] asset upload failed:', e)
     assetIsError.value = true
@@ -399,7 +400,6 @@ watch(
   async (value) => {
     console.log('[CourseDetail] selectedCourse changed =', value)
     if (value?.id) {
-      assetFailed.value = false
       assetMessage.value = ''
       await loadEnrollmentStatus()
     }
@@ -414,6 +414,19 @@ watch(
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.thumb-skeleton {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #eef1f6 25%, #f6f8fb 50%, #eef1f6 75%);
+  background-size: 200% 100%;
+  animation: thumb-shimmer 1.2s infinite;
+}
+
+@keyframes thumb-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .watermark-note {
