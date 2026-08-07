@@ -24,7 +24,6 @@ public class CourseController {
 
     /**
      * POST /courses - 디자인 등록 (디자이너만)
-     * Gateway에서 전달한 X-User-Id 헤더로 디자이너 ID 추출
      */
     @PostMapping
     public ResponseEntity<CourseDto.ApiResponse<CourseDto.CourseResponse>> createCourse(
@@ -41,9 +40,9 @@ public class CourseController {
     /**
      * POST /courses/{id}/asset - 디자인 이미지 업로드
      *
-     * multipart/form-data, 필드명 file.
+     * 업로드된 한 장으로 원본본(비가시적)과 미리보기본(가시적+비가시적)을 함께 만든다.
      * 응답으로 갱신된 CourseResponse 를 돌려주므로 프론트가 곧바로
-     * originalUrl / thumbnailUrl 을 받아 화면에 반영할 수 있다.
+     * hasAsset / thumbnailUrl 을 받아 화면에 반영할 수 있다.
      */
     @PostMapping(value = "/{id}/asset", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<CourseDto.ApiResponse<CourseDto.CourseResponse>> uploadAsset(
@@ -56,40 +55,56 @@ public class CourseController {
     }
 
     /**
-     * GET /courses/{id}/asset/preview - 이미지 바이너리 응답
+     * GET /courses/{id}/asset/preview - 워터마크본 바이너리 응답
      *
-     * img 태그의 src 로 직접 쓰이므로 인증 헤더 없이 접근 가능해야 한다.
-     * 래퍼 없이 바이트를 그대로 내려준다.
+     * 공개 이미지이므로 언제나 워터마크가 박힌 쪽을 내려준다.
+     * 자산이 없으면 404 (GlobalExceptionHandler 에서 매핑).
      */
     @GetMapping("/{id}/asset/preview")
     public ResponseEntity<Resource> previewAsset(@PathVariable Long id) {
-        Resource resource = courseService.loadAsset(id);
+        Resource resource = courseService.loadPreview(id);
 
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(courseService.assetContentType(id)))
+                .contentType(MediaType.parseMediaType(courseService.previewContentType(id)))
                 .header(HttpHeaders.CACHE_CONTROL, "max-age=3600")
                 .body(resource);
     }
 
     /**
-     * GET /courses/{id}/asset/download - 파일 다운로드
+     * GET /courses/{id}/asset/download - 원본 다운로드
+     *
+     * 소유자 또는 구매자만 받을 수 있다. 그 외에는 403.
      */
     @GetMapping("/{id}/asset/download")
-    public ResponseEntity<Resource> downloadAsset(@PathVariable Long id) {
-        Resource resource = courseService.loadAsset(id);
+    public ResponseEntity<Resource> downloadAsset(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") Long userId) {
+
+        Resource resource = courseService.loadOriginalForDownload(id, userId);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + resource.getFilename() + "\"")
+                        "attachment; filename=\"" + courseService.downloadFileName(id) + "\"")
                 .body(resource);
+    }
+
+    /**
+     * POST /courses/assets/verify - 유출 사본 검증
+     *
+     * 비가시적 워터마크를 추출해 어느 디자인·누구 소유였는지 확인한다.
+     */
+    @PostMapping(value = "/assets/verify", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<CourseDto.ApiResponse<CourseDto.WatermarkVerifyResponse>> verifyAsset(
+            @RequestPart("file") MultipartFile file) {
+
+        return ResponseEntity.ok(
+                CourseDto.ApiResponse.success(courseService.verifyAsset(file))
+        );
     }
 
     // ──────────────────────────────────────────────────────
 
-    /**
-     * GET /courses - 전체 디자인 목록
-     */
     @GetMapping
     public ResponseEntity<CourseDto.ApiResponse<List<CourseDto.CourseResponse>>> getAllCourses() {
         return ResponseEntity.ok(
@@ -97,9 +112,6 @@ public class CourseController {
         );
     }
 
-    /**
-     * GET /courses/{id} - 디자인 상세
-     */
     @GetMapping("/{id}")
     public ResponseEntity<CourseDto.ApiResponse<CourseDto.CourseResponse>> getCourse(
             @PathVariable Long id) {
@@ -108,9 +120,6 @@ public class CourseController {
         );
     }
 
-    /**
-     * GET /courses/category/{category} - 카테고리별 디자인
-     */
     @GetMapping("/category/{category}")
     public ResponseEntity<CourseDto.ApiResponse<List<CourseDto.CourseResponse>>> getCoursesByCategory(
             @PathVariable Course.Category category) {
@@ -119,34 +128,22 @@ public class CourseController {
         );
     }
 
-    /**
-     * GET /courses/internal/exists/{id} - 디자인 존재 여부 (Enrollment Service 호출)
-     */
     @GetMapping("/internal/exists/{id}")
     public ResponseEntity<Boolean> existsCourse(@PathVariable Long id) {
         return ResponseEntity.ok(courseService.existsCourse(id));
     }
 
-    /**
-     * GET /courses/internal/{id} - 디자인 상세 조회 (Enrollment Service 내부 호출용)
-     */
     @GetMapping("/internal/{id}")
     public ResponseEntity<CourseDto.CourseResponse> getCourseInternal(@PathVariable Long id) {
         return ResponseEntity.ok(courseService.getCourse(id));
     }
 
-    /**
-     * POST /courses/internal/{id}/enrollment-count - 구매자 수 증가 (Enrollment Service 호출)
-     */
     @PostMapping("/internal/{id}/enrollment-count")
     public ResponseEntity<Void> increaseEnrollmentCount(@PathVariable Long id) {
         courseService.increaseEnrollmentCount(id);
         return ResponseEntity.ok().build();
     }
 
-    /**
-     * GET /courses/internal/recommend - 추천 서비스용 미구매 디자인 조회
-     */
     @GetMapping("/internal/recommend")
     public ResponseEntity<List<CourseDto.CourseResponse>> getRecommendCourses(
             @RequestParam Course.Category category,
@@ -166,8 +163,7 @@ public class CourseController {
     }
 
     /**
-     * GET /courses/sales/me - 판매 대시보드 (강사 본인)
-     * Gateway가 전달한 X-User-Id 헤더 사용
+     * GET /courses/sales/me - 판매 대시보드 (디자이너 본인)
      */
     @GetMapping("/sales/me")
     public ResponseEntity<CourseDto.ApiResponse<CourseDto.SalesDashboardResponse>> getMySales(

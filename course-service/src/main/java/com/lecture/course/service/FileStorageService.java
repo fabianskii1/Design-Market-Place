@@ -1,5 +1,6 @@
 package com.lecture.course.service;
 
+import com.lecture.course.exception.AssetNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
@@ -47,46 +48,67 @@ public class FileStorageService {
     }
 
     /**
-     * 파일을 저장하고 저장된 파일명을 반환한다.
-     * 원본 파일명은 신뢰하지 않는다 (경로 조작 방지). UUID + 확장자로만 저장한다.
+     * 처리된 이미지 바이트를 저장하고 저장된 파일명을 반환한다.
+     *
+     * 워터마크 처리 결과는 항상 PNG다. JPEG로 저장하면 비가시적 워터마크의
+     * 최하위 비트가 파괴되어 추출이 불가능해진다.
+     *
+     * @param suffix 용도 구분자 ("original" | "preview")
      */
-    public String store(Long courseId, MultipartFile file) {
-        validate(file);
-
-        String extension = resolveExtension(file.getContentType());
-        String storedName = "design-" + courseId + "-" + UUID.randomUUID() + extension;
-        Path target = root.resolve(storedName).normalize();
-
-        // 정규화 후에도 루트 밖을 가리키면 거부한다
-        if (!target.getParent().equals(root)) {
-            throw new IllegalArgumentException("잘못된 파일 경로입니다.");
+    public String storePng(Long courseId, byte[] bytes, String suffix) {
+        if (bytes == null || bytes.length == 0) {
+            throw new IllegalArgumentException("저장할 데이터가 없습니다.");
         }
 
-        try (var in = file.getInputStream()) {
-            Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+        String storedName = "design-" + courseId + "-" + suffix + "-" + UUID.randomUUID() + ".png";
+        Path target = resolveSafely(storedName);
+
+        try {
+            Files.write(target, bytes,
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         } catch (IOException e) {
             throw new IllegalStateException("파일 저장에 실패했습니다: " + storedName, e);
         }
 
-        log.info("[Storage] 저장 완료 courseId={} file={} size={}B", courseId, storedName, file.getSize());
+        log.info("[Storage] 저장 완료 courseId={} file={} size={}B", courseId, storedName, bytes.length);
         return storedName;
+    }
+
+    /** 업로드 파일을 바이트로 읽는다 (워터마크 처리 입력용) */
+    public byte[] readUpload(MultipartFile file) {
+        validate(file);
+        try {
+            return file.getBytes();
+        } catch (IOException e) {
+            throw new IllegalArgumentException("업로드 파일을 읽을 수 없습니다.", e);
+        }
     }
 
     /** 저장된 파일을 읽어온다 (미리보기·다운로드용) */
     public Resource load(String storedName) {
+        if (storedName == null || storedName.isBlank()) {
+            throw new AssetNotFoundException("등록된 파일이 없습니다.");
+        }
+
         try {
-            Path target = root.resolve(storedName).normalize();
-            if (!target.getParent().equals(root)) {
-                throw new IllegalArgumentException("잘못된 파일 경로입니다.");
-            }
+            Path target = resolveSafely(storedName);
 
             Resource resource = new UrlResource(target.toUri());
             if (!resource.exists() || !resource.isReadable()) {
-                throw new IllegalArgumentException("파일을 찾을 수 없습니다: " + storedName);
+                throw new AssetNotFoundException("파일을 찾을 수 없습니다: " + storedName);
             }
             return resource;
         } catch (IOException e) {
-            throw new IllegalArgumentException("파일을 읽을 수 없습니다: " + storedName, e);
+            throw new AssetNotFoundException("파일을 읽을 수 없습니다: " + storedName);
+        }
+    }
+
+    /** 저장된 파일의 바이트 (검증 시 체크섬 비교용) */
+    public byte[] loadBytes(String storedName) {
+        try {
+            return Files.readAllBytes(resolveSafely(storedName));
+        } catch (IOException e) {
+            throw new AssetNotFoundException("파일을 읽을 수 없습니다: " + storedName);
         }
     }
 
@@ -94,21 +116,23 @@ public class FileStorageService {
     public void deleteQuietly(String storedName) {
         if (storedName == null || storedName.isBlank()) return;
         try {
-            Files.deleteIfExists(root.resolve(storedName).normalize());
-        } catch (IOException e) {
+            Files.deleteIfExists(resolveSafely(storedName));
+        } catch (Exception e) {
             log.warn("[Storage] 이전 파일 삭제 실패 (무시): {}", storedName, e);
         }
     }
 
     /** 저장된 파일명으로 Content-Type 추정 */
     public String contentTypeOf(String storedName) {
+        if (storedName == null) return "application/octet-stream";
         String lower = storedName.toLowerCase();
         if (lower.endsWith(".png")) return "image/png";
         if (lower.endsWith(".webp")) return "image/webp";
         return "image/jpeg";
     }
 
-    private void validate(MultipartFile file) {
+    /** 업로드 파일 사전 검증. 클라이언트 입력 오류이므로 400으로 처리된다. */
+    public void validate(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("업로드할 파일이 없습니다.");
         }
@@ -120,11 +144,12 @@ public class FileStorageService {
         }
     }
 
-    private String resolveExtension(String contentType) {
-        return switch (contentType) {
-            case "image/png" -> ".png";
-            case "image/webp" -> ".webp";
-            default -> ".jpg";
-        };
+    /** 정규화 후에도 루트 밖을 가리키면 거부한다 (경로 조작 방지) */
+    private Path resolveSafely(String storedName) {
+        Path target = root.resolve(storedName).normalize();
+        if (!target.getParent().equals(root)) {
+            throw new IllegalArgumentException("잘못된 파일 경로입니다.");
+        }
+        return target;
     }
 }
