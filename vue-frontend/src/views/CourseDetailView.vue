@@ -15,7 +15,6 @@
 
             <div class="detail-meta">
               <span>디자이너: {{ displayInstructorName }}</span>
-              <span>수강생: {{ displayEnrollmentCount }}명</span>
             </div>
           </div>
 
