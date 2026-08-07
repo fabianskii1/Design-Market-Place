@@ -255,15 +255,17 @@ async function loadStudentRecommendations() {
 
     const payload = res.data
 
+    const RECOMMEND_MESSAGE = '최근에 구매했던 디자이너의 제품과 구매했던 제품과 유사한 디자인을 추천합니다.'
+
     if (Array.isArray(payload?.recommendedCourses)) {
       recommendations.value = payload.recommendedCourses
-      recommendMessage.value = payload.message ?? ''
+      recommendMessage.value = RECOMMEND_MESSAGE
     } else if (Array.isArray(payload?.data)) {
       recommendations.value = payload.data
-      recommendMessage.value = payload.message ?? ''
+      recommendMessage.value = RECOMMEND_MESSAGE
     } else if (Array.isArray(payload)) {
       recommendations.value = payload
-      recommendMessage.value = ''
+      recommendMessage.value = RECOMMEND_MESSAGE
     } else {
       console.warn('[MyPage] unexpected recommendation response shape:', payload)
       recommendations.value = []

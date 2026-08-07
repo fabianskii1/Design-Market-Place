@@ -2,23 +2,16 @@
   <div class="sales-tab">
     <div class="summary-cards">
       <div class="summary-card">
+        <div class="summary-label">이번 달 매출</div>
+        <div class="summary-value">{{ formatPrice(thisMonthRevenue) }}</div>
+      </div>
+      <div class="summary-card">
         <div class="summary-label">총 판매 건수</div>
         <div class="summary-value">{{ totalSalesCount }}건</div>
       </div>
       <div class="summary-card">
         <div class="summary-label">총 매출액</div>
         <div class="summary-value">{{ formatPrice(totalRevenue) }}</div>
-      </div>
-    </div>
-
-    <div v-if="monthlyBreakdown.length" class="monthly-section fade-in">
-      <div class="monthly-title">월별 매출</div>
-      <div class="monthly-list">
-        <div v-for="m in monthlyBreakdown" :key="m.month" class="monthly-row">
-          <span class="monthly-month">{{ m.month }}</span>
-          <span class="monthly-count">{{ m.salesCount }}건</span>
-          <span class="monthly-revenue">{{ formatPrice(m.revenue) }}</span>
-        </div>
       </div>
     </div>
 
@@ -40,30 +33,16 @@
         </div>
 
         <div class="sales-meta-grid">
-          <div class="meta-box">
-            <div class="meta-label">단가</div>
-            <div class="meta-value">{{ formatPrice(item.price) }}</div>
+          <div class="meta-box" v-for="tier in LICENSE_TIERS" :key="tier.tier">
+            <div class="meta-label">{{ tier.label }}</div>
+            <div class="meta-value">{{ tierCount(item, tier.tier) }}건</div>
+            <div class="meta-sub">{{ formatPrice(tierRevenue(item, tier.tier)) }}</div>
           </div>
-          <div class="meta-box">
-            <div class="meta-label">판매 건수</div>
-            <div class="meta-value">{{ item.salesCount }}건</div>
-          </div>
-          <div class="meta-box">
-            <div class="meta-label">매출액</div>
-            <div class="meta-value">{{ formatPrice(item.revenue) }}</div>
-          </div>
-        </div>
 
-        <div v-if="item.salesByLicense?.length" class="license-breakdown">
-          <div class="license-breakdown-title">라이선스별 매출</div>
-          <div
-            v-for="lic in item.salesByLicense"
-            :key="lic.tier"
-            class="license-breakdown-row"
-          >
-            <span class="license-breakdown-label">{{ tierLabel(lic.tier) }}</span>
-            <span class="license-breakdown-count">{{ lic.count }}건</span>
-            <span class="license-breakdown-revenue">{{ formatPrice(lic.revenue) }}</span>
+          <div class="meta-box meta-box-total">
+            <div class="meta-label">합계</div>
+            <div class="meta-value">{{ item.salesCount }}건</div>
+            <div class="meta-sub">{{ formatPrice(item.revenue) }}</div>
           </div>
         </div>
       </div>
@@ -92,14 +71,25 @@ const totalRevenue = computed(() =>
   sales.value.reduce((sum, item) => sum + (Number(item.revenue) || 0), 0)
 )
 
+const thisMonthRevenue = computed(() => {
+  const now = new Date()
+  const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const found = monthlyBreakdown.value.find(m => m.month === key)
+  return found?.revenue ?? 0
+})
+
 function formatPrice(price) {
   const value = Number(price ?? 0)
   if (Number.isNaN(value)) return '-'
   return `${value.toLocaleString()}원`
 }
 
-function tierLabel(tier) {
-  return LICENSE_TIERS.find(t => t.tier === tier)?.label ?? tier
+function tierCount(item, tier) {
+  return item.salesByLicense?.find(l => l.tier === tier)?.count ?? 0
+}
+
+function tierRevenue(item, tier) {
+  return item.salesByLicense?.find(l => l.tier === tier)?.revenue ?? 0
 }
 
 /**
@@ -109,7 +99,6 @@ function normalizeSalesItem(raw, index) {
   return {
     id: raw.id ?? raw.courseId ?? raw.designId ?? index,
     title: raw.title ?? raw.courseTitle ?? raw.designTitle ?? raw.name ?? '이름 없음',
-    price: raw.price ?? raw.unitPrice ?? 0,
     salesCount: raw.salesCount ?? raw.purchaseCount ?? raw.count ?? 0,
     revenue: raw.revenue ?? raw.totalRevenue ?? raw.totalAmount ?? raw.amount ?? 0,
     salesByLicense: raw.salesByLicense ?? []
@@ -143,7 +132,7 @@ onMounted(loadSales)
 
 .summary-cards {
   display: grid;
-  grid-template-columns: repeat(2, minmax(160px, 220px));
+  grid-template-columns: repeat(3, minmax(160px, 220px));
   gap: 16px;
   margin-bottom: 20px;
 }
@@ -251,7 +240,7 @@ onMounted(loadSales)
 
 .sales-meta-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
 
@@ -259,6 +248,10 @@ onMounted(loadSales)
   background: var(--color-bg-secondary);
   border-radius: var(--radius-md);
   padding: 14px;
+}
+
+.meta-box-total {
+  background: var(--color-primary-light);
 }
 
 .meta-label {
@@ -273,6 +266,17 @@ onMounted(loadSales)
   color: var(--color-text-primary);
 }
 
+.meta-sub {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+}
+
+.meta-box-total .meta-label,
+.meta-box-total .meta-sub {
+  color: var(--color-primary);
+}
+
 .empty-text {
   color: var(--color-text-muted);
   font-size: 14px;
@@ -285,9 +289,12 @@ onMounted(loadSales)
 }
 
 @media (max-width: 992px) {
-  .loading-row,
-  .sales-meta-grid {
+  .loading-row {
     grid-template-columns: 1fr;
+  }
+
+  .sales-meta-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .summary-cards {
@@ -296,6 +303,10 @@ onMounted(loadSales)
 }
 
 @media (max-width: 640px) {
+  .sales-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
   .summary-cards {
     grid-template-columns: 1fr;
   }
