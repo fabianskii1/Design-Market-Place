@@ -139,7 +139,7 @@
                 <div class="course-meta-grid">
                   <div class="meta-box">
                     <div class="meta-label">카테고리</div>
-                    <div class="meta-value">{{ course.category || '-' }}</div>
+                    <div class="meta-value">{{ categoryLabel(course.category) || '-' }}</div>
                   </div>
                   <div class="meta-box">
                     <div class="meta-label">가격</div>
@@ -184,6 +184,7 @@ import CourseCard from '@/components/CourseCard.vue'
 import { useAuthStore } from '@/store/auth.js'
 import { enrollmentApi } from '@/api/enrollment.js'
 import { courseApi } from '@/api/course.js'
+import { categoryLabel } from '@/api/category.js'
 import SalesTab from '@/components/SalesTab.vue'
 
 const router = useRouter()

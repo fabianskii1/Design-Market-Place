@@ -133,32 +133,60 @@
                 placeholder="디자인 소개, 디자인 특징 등을 입력해 주세요."
               ></textarea>
               </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label" for="category">카테고리</label>
-                <select id="category" v-model="form.category" class="form-select">
-                  <option disabled value="">카테고리를 선택하세요</option>
-                  <option
-                    v-for="option in categoryOptions"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </option>
-                </select>
+            <div class="form-section">
+              <h3 class="form-section-title">카테고리 및 라이선스</h3>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="category">카테고리</label>
+                  <select id="category" v-model="form.category" class="form-select">
+                    <option disabled value="">카테고리를 선택하세요</option>
+                    <option
+                      v-for="option in categoryOptions"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="price">가격</label>
+                  <input
+                    id="price"
+                    v-model.number="form.price"
+                    type="number"
+                    min="0"
+                    step="1000"
+                    class="form-input"
+                    placeholder="예: 50000"
+                  />
+                </div>
               </div>
 
               <div class="form-group">
-                <label class="form-label" for="price">가격</label>
-                <input
-                  id="price"
-                  v-model.number="form.price"
-                  type="number"
-                  min="0"
-                  step="1000"
-                  class="form-input"
-                  placeholder="예: 50000"
-                />
+                <label class="form-label">라이선스별 가격</label>
+                <p class="field-hint">
+                  등급별로 구매자가 어디까지 쓸 수 있는지 확인하고 가격을 정해주세요.
+                </p>
+
+                <div class="license-price-grid">
+                  <div v-for="t in LICENSE_TIERS" :key="t.tier" class="license-price-item">
+                    <div class="license-price-top">
+                      <span class="license-price-label">{{ t.label }}</span>
+                    </div>
+                    <p class="license-price-summary">{{ t.summary }}</p>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1000"
+                      class="form-input"
+                      placeholder="예: 50000"
+                      v-model.number="licensePrices[t.tier]"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -199,6 +227,7 @@ import AppHeader from '@/components/AppHeader.vue'
 import { courseApi } from '@/api/course.js'
 import { useAuthStore } from '@/store/auth.js'
 import { LICENSE_TIERS } from '@/api/license.js'
+import { CATEGORY_OPTIONS } from '@/api/category.js'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -305,13 +334,7 @@ onBeforeUnmount(revokePreview)
 const submitError = ref('')
 const submitSuccess = ref('')
 
-const categoryOptions = [
-  { label: '로고 / 브랜딩', value: 'BACKEND' },
-  { label: 'UX / UI 키트', value: 'FRONTEND' },
-  { label: '일러스트', value: 'DEVOPS' },
-  { label: '아이콘', value: 'DATA' },
-  { label: '템플릿', value: 'DATA_SCIENCE' }
-]
+const categoryOptions = CATEGORY_OPTIONS
 
 function handleLogout() {
   auth.logout()
@@ -701,6 +724,62 @@ async function handleSubmit() {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+}
+
+.form-section {
+  border: 1px solid var(--color-border, #d7dbe3);
+  border-radius: var(--radius-md, 10px);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-primary, #1e2430);
+}
+
+.license-price-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.license-price-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--color-border, #d7dbe3);
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-bg-secondary, #f7f8fa);
+}
+
+.license-price-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.license-price-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary, #1e2430);
+}
+
+.license-price-summary {
+  font-size: 12px;
+  color: var(--color-text-secondary, #5b6475);
+  line-height: 1.4;
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .license-price-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .form-group {
