@@ -13,8 +13,37 @@
               {{ course.description || '실무 전문가가 직접 설계한 커리큘럼으로 체계적으로 학습하세요.' }}
             </p>
 
-            <div class="detail-meta">
-              <span>디자이너: {{ displayInstructorName }}</span>
+            <!-- 디자이너 연락처 -->
+            <div class="designer-box">
+              <div class="designer-avatar">{{ designerInitial }}</div>
+
+              <div class="designer-info">
+                <div class="designer-label">디자이너</div>
+                <div class="designer-name">{{ displayInstructorName }}</div>
+
+                <a
+                  v-if="designerEmail"
+                  :href="`mailto:${designerEmail}`"
+                  class="designer-email"
+                  :title="designerEmail"
+                >
+                  ✉ {{ designerEmail }}
+                </a>
+                <div v-else-if="designerLoading" class="designer-email muted">
+                  연락처를 불러오는 중...
+                </div>
+                <div v-else class="designer-email muted">
+                  연락처가 등록되지 않았습니다
+                </div>
+              </div>
+
+              <a
+                v-if="designerEmail"
+                :href="contactMailto"
+                class="btn btn-outline designer-contact"
+              >
+                문의하기
+              </a>
             </div>
           </div>
 
@@ -120,6 +149,7 @@ import AppHeader from '@/components/AppHeader.vue'
 import { useCourseStore } from '@/store/course.js'
 import { enrollmentApi } from '@/api/enrollment.js'
 import { courseApi } from '@/api/course.js'
+import { userApi } from '@/api/user.js'
 import { useAssetImage, invalidateAssetCache } from '@/composables/useAssetImage.js'
 import { useAuthStore } from '@/store/auth.js'
 
@@ -130,6 +160,52 @@ const auth = useAuthStore()
 
 const enrolling = ref(false)
 const enrollError = ref('')
+
+// ── 디자이너 연락처 ──────────────────────────────
+// course 응답에 이름·이메일이 없어 instructorId 로 user-service 를 한 번 더 조회한다.
+// 백엔드가 CourseResponse 에 필드를 추가하면 아래 fetch 는 지워도 된다.
+const designer = ref(null)
+const designerLoading = ref(false)
+
+const designerEmail = computed(() =>
+  course.value?.designerEmail ?? course.value?.instructorEmail ?? designer.value?.email ?? ''
+)
+
+const designerInitial = computed(() => {
+  const name = displayInstructorName.value
+  return name && name !== '디자이너 정보 없음' ? name.charAt(0) : '?'
+})
+
+/** 제목을 미리 채운 문의 메일. 디자이너가 어떤 작업 문의인지 바로 알 수 있다. */
+const contactMailto = computed(() => {
+  if (!designerEmail.value) return ''
+  const subject = encodeURIComponent(`[DesignMarket] '${course.value?.title ?? ''}' 문의`)
+  const body = encodeURIComponent(
+    `안녕하세요.\n\n'${course.value?.title ?? ''}' 디자인에 대해 문의드립니다.\n\n`
+  )
+  return `mailto:${designerEmail.value}?subject=${subject}&body=${body}`
+})
+
+async function loadDesigner() {
+  designer.value = null
+
+  const designerId = course.value?.instructorId ?? course.value?.instructor_id
+  if (!designerId) return
+
+  // 백엔드가 이미 내려줬다면 추가 조회가 필요 없다
+  if (course.value?.designerEmail || course.value?.instructorEmail) return
+
+  designerLoading.value = true
+  try {
+    const res = await userApi.getById(designerId)
+    designer.value = res.data?.data ?? res.data ?? null
+  } catch (e) {
+    // 연락처를 못 불러와도 상세 화면 자체는 정상 동작해야 한다
+    console.warn('[CourseDetail] 디자이너 정보 조회 실패:', e)
+  } finally {
+    designerLoading.value = false
+  }
+}
 
 // ── 디자인 자산 (미리보기 · 업로드 · 다운로드) ──────────────
 const fileInput = ref(null)
@@ -160,6 +236,8 @@ const displayCategory = computed(() => course.value?.category || '-')
 
 const displayInstructorName = computed(() => {
   return (
+    designer.value?.name ||
+    course.value?.designerName ||
     course.value?.instructorName ||
     course.value?.teacherName ||
     course.value?.instructor?.name ||
@@ -390,6 +468,7 @@ async function handlePrimaryAction() {
 
 onMounted(async () => {
   await courseStore.fetchCourse(route.params.id)
+  await loadDesigner()
   console.log('[CourseDetail] selectedCourse =', courseStore.selectedCourse)
   await loadEnrollmentStatus()
 })
@@ -400,6 +479,7 @@ watch(
     console.log('[CourseDetail] selectedCourse changed =', value)
     if (value?.id) {
       assetMessage.value = ''
+      await loadDesigner()
       await loadEnrollmentStatus()
     }
   },
@@ -408,6 +488,78 @@ watch(
 </script>
 
 <style scoped>
+/* ── 디자이너 연락처 ───────────────────────────── */
+.designer-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--color-border, #d7dbe3);
+  border-radius: var(--radius-md, 10px);
+  max-width: 480px;
+}
+
+.designer-avatar {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-primary, #2d5bd7);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.designer-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.designer-label {
+  font-size: 11px;
+  color: var(--color-text-muted, #8b93a3);
+  letter-spacing: 0.04em;
+}
+
+.designer-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary, #1e2430);
+  margin-top: 1px;
+}
+
+.designer-email {
+  display: block;
+  font-size: 12px;
+  color: var(--color-primary, #2d5bd7);
+  text-decoration: none;
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-email:hover {
+  text-decoration: underline;
+}
+
+.designer-email.muted {
+  color: var(--color-text-muted, #8b93a3);
+}
+
+.designer-contact {
+  flex-shrink: 0;
+  font-size: 13px;
+  padding: 7px 14px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
 /* ── 디자인 자산 ───────────────────────────────── */
 .asset-preview {
   width: 100%;
