@@ -5,7 +5,7 @@ export const enrollmentApi = {
     return api.get('/api/enrollments/my')
   },
   enroll(courseId) {
-    return api.post('/api/enrollments', { courseId })
+  return api.post('/api/enrollments', { courseId })
   },
   cancel(enrollmentId) {
     return api.delete(`/api/enrollments/${enrollmentId}`)

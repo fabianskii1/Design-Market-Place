@@ -132,8 +132,7 @@
                 rows="6"
                 placeholder="디자인 소개, 디자인 특징 등을 입력해 주세요."
               ></textarea>
-            </div>
-
+              </div>
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label" for="category">카테고리</label>
@@ -164,6 +163,7 @@
             </div>
 
             <div v-if="validationError" class="error-box">
+        
               {{ validationError }}
             </div>
 
@@ -198,6 +198,7 @@ import { useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import { courseApi } from '@/api/course.js'
 import { useAuthStore } from '@/store/auth.js'
+import { LICENSE_TIERS } from '@/api/license.js'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -207,6 +208,11 @@ const form = reactive({
   description: '',
   category: '',
   price: null
+})
+const licensePrices = reactive({
+  PERSONAL: null,
+  COMMERCIAL_SMALL: null,
+  COMMERCIAL_LARGE: null
 })
 
 const submitting = ref(false)
@@ -405,6 +411,19 @@ async function handleSubmit() {
       submitError.value = (status === 404 || status === 405)
         ? '디자인은 등록되었으나 파일 업로드 API가 아직 준비되지 않았습니다. 백엔드 배포 후 상세 화면에서 다시 올려주세요.'
         : (uploadError.response?.data?.message || '디자인은 등록되었으나 파일 업로드에 실패했습니다.')
+    }
+    try {
+      const tiers = LICENSE_TIERS.map(t => ({
+        tier: t.tier,
+        price: Number(licensePrices[t.tier]) || 0
+      }))
+      await courseApi.createLicenseTiers(createdCourseId, tiers)
+    } catch (tierError) {
+      console.error('[CourseCreate] license tier save failed:', tierError)
+      const status = tierError.response?.status
+      submitError.value = (status === 404 || status === 405)
+        ? '디자인은 등록되었으나 라이선스별 가격 저장 API가 아직 준비되지 않았습니다. 백엔드 배포 후 다시 설정해주세요.'
+        : (tierError.response?.data?.message || '라이선스별 가격 저장에 실패했습니다.')
     }
 
     setTimeout(() => router.push(`/courses/${createdCourseId}`), 900)

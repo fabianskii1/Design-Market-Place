@@ -21,6 +21,14 @@ export const courseApi = {
     return api.put(`/api/courses/${id}`, data)
   },
 
+  getLicenseTiers(id) {
+  return api.get(`/api/courses/${id}/license-tiers`)
+  },
+
+  createLicenseTiers(id, tiers) {
+    return api.post(`/api/courses/${id}/license-tiers`, { tiers })
+  },
+
   // ── 디자인 자산 (이미지) ────────────────────────────────
 
   uploadAsset(designId, file, onProgress) {

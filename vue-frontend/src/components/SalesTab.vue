@@ -11,6 +11,17 @@
       </div>
     </div>
 
+    <div v-if="monthlyBreakdown.length" class="monthly-section fade-in">
+      <div class="monthly-title">월별 매출</div>
+      <div class="monthly-list">
+        <div v-for="m in monthlyBreakdown" :key="m.month" class="monthly-row">
+          <span class="monthly-month">{{ m.month }}</span>
+          <span class="monthly-count">{{ m.salesCount }}건</span>
+          <span class="monthly-revenue">{{ formatPrice(m.revenue) }}</span>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading-row sales-loading">
       <div v-for="i in 3" :key="i" class="skeleton-card">
         <div class="skeleton-thumb"></div>
@@ -42,6 +53,19 @@
             <div class="meta-value">{{ formatPrice(item.revenue) }}</div>
           </div>
         </div>
+
+        <div v-if="item.salesByLicense?.length" class="license-breakdown">
+          <div class="license-breakdown-title">라이선스별 매출</div>
+          <div
+            v-for="lic in item.salesByLicense"
+            :key="lic.tier"
+            class="license-breakdown-row"
+          >
+            <span class="license-breakdown-label">{{ tierLabel(lic.tier) }}</span>
+            <span class="license-breakdown-count">{{ lic.count }}건</span>
+            <span class="license-breakdown-revenue">{{ formatPrice(lic.revenue) }}</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -53,10 +77,12 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { salesApi } from '@/api/sales.js'
+import { LICENSE_TIERS } from '@/api/license.js'
 
 const sales = ref([])
 const loading = ref(true)
 const error = ref('')
+const monthlyBreakdown = ref([])
 
 const totalSalesCount = computed(() =>
   sales.value.reduce((sum, item) => sum + (Number(item.salesCount) || 0), 0)
@@ -72,6 +98,10 @@ function formatPrice(price) {
   return `${value.toLocaleString()}원`
 }
 
+function tierLabel(tier) {
+  return LICENSE_TIERS.find(t => t.tier === tier)?.label ?? tier
+}
+
 /**
  * 백엔드 응답 형태가 아직 확정되지 않았을 수 있어, 여러 필드명을 방어적으로 매핑한다.
  */
@@ -81,7 +111,8 @@ function normalizeSalesItem(raw, index) {
     title: raw.title ?? raw.courseTitle ?? raw.designTitle ?? raw.name ?? '이름 없음',
     price: raw.price ?? raw.unitPrice ?? 0,
     salesCount: raw.salesCount ?? raw.purchaseCount ?? raw.count ?? 0,
-    revenue: raw.revenue ?? raw.totalRevenue ?? raw.totalAmount ?? raw.amount ?? 0
+    revenue: raw.revenue ?? raw.totalRevenue ?? raw.totalAmount ?? raw.amount ?? 0,
+    salesByLicense: raw.salesByLicense ?? []
   }
 }
 
@@ -92,6 +123,7 @@ async function loadSales() {
 
     const items = res.data?.data?.items ?? []
     sales.value = items.map(normalizeSalesItem)
+    monthlyBreakdown.value = res.data?.data?.monthlyBreakdown ?? []
   } catch (err) {
     console.error('[SalesTab] failed to load sales:', err)
     error.value = '판매 현황을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'

@@ -35,6 +35,27 @@
 
             <div class="enroll-body">
               <div class="enroll-price">₩{{ displayPrice }}</div>
+              <div class="license-select">
+                <label
+                  v-for="t in mergedTiers"
+                  :key="t.tier"
+                  class="license-option"
+                  :class="{ active: selectedTier === t.tier }"
+                >
+                  <input type="radio" v-model="selectedTier" :value="t.tier" class="license-radio" />
+                  <div class="license-body">
+                    <div class="license-top">
+                      <span class="license-label">{{ t.label }}</span>
+                      <span class="license-price">₩{{ t.price.toLocaleString() }}</span>
+                    </div>
+                    <p class="license-summary">{{ t.summary }}</p>
+                  </div>
+                </label>
+                <p class="license-common">{{ COMMON_CLAUSE }}</p>
+              </div>
+              <button
+                class="btn btn-primary btn-full"
+
 
               <button
                 class="btn btn-primary btn-full"
@@ -122,6 +143,7 @@ import { useCourseStore } from '@/store/course.js'
 import { enrollmentApi } from '@/api/enrollment.js'
 import { courseApi } from '@/api/course.js'
 import { useAuthStore } from '@/store/auth.js'
+import { LICENSE_TIERS, COMMON_CLAUSE } from '@/api/license.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -140,8 +162,21 @@ const downloading = ref(false)
 const assetMessage = ref('')
 const assetIsError = ref(false)
 const enrollmentStatus = ref('NONE') // NONE | PENDING | ACTIVE
+const licenseTiers = ref([])       // 백엔드에서 받은 { tier, price } 목록
+const selectedTier = ref('PERSONAL')
 
 const course = computed(() => courseStore.selectedCourse)
+const mergedTiers = computed(() => {
+  return LICENSE_TIERS.map(meta => {
+    const found = licenseTiers.value.find(t => t.tier === meta.tier)
+    // 백엔드에 아직 등급별 가격이 없으면 대표가(course.price)로 대체
+    const price = found?.price ?? course.value?.price ?? 0
+    return { ...meta, price }
+  })
+})
+const selectedTierInfo = computed(() =>
+  mergedTiers.value.find(t => t.tier === selectedTier.value) || mergedTiers.value[0]
+)
 const loading = computed(() => courseStore.loading)
 const isInstructor = computed(() => auth.user?.role === 'INSTRUCTOR')
 
@@ -180,7 +215,7 @@ const displayEnrollmentCount = computed(() => {
 })
 
 const displayPrice = computed(() => {
-  const value = Number(course.value?.price ?? 0)
+  const value = Number(selectedTierInfo.value?.price ?? course.value?.price ?? 0)
   return Number.isNaN(value) ? '0' : value.toLocaleString()
 })
 
@@ -282,6 +317,17 @@ async function handleDownload() {
   }
 }
 
+async function loadLicenseTiers() {
+  if (!course.value?.id) return
+  try {
+    const res = await courseApi.getLicenseTiers(course.value.id)
+    licenseTiers.value = res.data?.data ?? []
+  } catch (e) {
+    console.error('[CourseDetail] license tiers load failed:', e)
+    licenseTiers.value = []
+  }
+}
+
 const thumbSrc = computed(() => {
   const key = course.value?.thumbnail || config.value.thumb
   if (!key) return null
@@ -378,7 +424,7 @@ async function handlePrimaryAction() {
   enrolling.value = true
 
   try {
-    await enrollmentApi.enroll(course.value.id)
+    await enrollmentApi.enroll(course.value.id, selectedTier.value)
     enrollmentStatus.value = 'PENDING'
   } catch (e) {
     console.error('[CourseDetail] enroll failed:', e)
@@ -388,11 +434,13 @@ async function handlePrimaryAction() {
   }
 }
 
+
 onMounted(async () => {
   await courseStore.fetchCourse(route.params.id)
-  console.log('[CourseDetail] selectedCourse =', courseStore.selectedCourse)
   await loadEnrollmentStatus()
+  await loadLicenseTiers()
 })
+
 
 watch(
   () => courseStore.selectedCourse,
