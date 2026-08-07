@@ -21,7 +21,6 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import java.math.BigDecimal;
 
 
 @Slf4j
@@ -227,57 +226,6 @@ public class CourseService {
         }
     }
 
-
-    // ── 판매 대시보드 ──────────────────────────────────────
-
-    /**
-     * 디자인별 라이선스 등급 목록 조회.
-     * 등록 API는 아직 없으므로 빈 목록이 정상이다.
-     */
-    public List<CourseDto.LicenseTierResponse> getLicenseTiers(Long courseId) {
-        return licenseTierRepository.findByCourseId(courseId).stream()
-                .map(CourseDto.LicenseTierResponse::from)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * 디자이너 본인의 판매 실적.
-     * 별도 집계 테이블 없이 실시간 쿼리로 처리한다.
-     */
-    public CourseDto.SalesDashboardResponse getMySales(Long instructorId) {
-        List<Course> myCourses = courseRepository.findByInstructorId(instructorId);
-
-        List<Long> courseIds = myCourses.stream().map(Course::getId).toList();
-        Map<Long, PaymentServiceClient.CourseSales> sales =
-                paymentServiceClient.getSalesSummary(courseIds);
-
-        List<CourseDto.SalesItemResponse> items = myCourses.stream()
-                .map(course -> {
-                    PaymentServiceClient.CourseSales s = sales.get(course.getId());
-                    return CourseDto.SalesItemResponse.from(
-                            course,
-                            s == null ? 0 : s.salesCount().intValue(),
-                            s == null ? BigDecimal.ZERO : s.totalRevenue());
-                })
-                .sorted((a, b) -> b.getRevenue().compareTo(a.getRevenue()))
-                .collect(Collectors.toList());
-
-        int totalSalesCount = items.stream()
-                .mapToInt(CourseDto.SalesItemResponse::getSalesCount)
-                .sum();
-
-        BigDecimal totalRevenue = items.stream()
-                .map(CourseDto.SalesItemResponse::getRevenue)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        return CourseDto.SalesDashboardResponse.builder()
-                .instructorId(instructorId)
-                .designCount(items.size())
-                .totalSalesCount(totalSalesCount)
-                .totalRevenue(totalRevenue)
-                .items(items)
-                .build();
-    }
 
     // ── 조회 ──────────────────────────────────────────────
 

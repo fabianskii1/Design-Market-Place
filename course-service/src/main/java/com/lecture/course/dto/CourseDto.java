@@ -85,30 +85,6 @@ public class CourseDto {
         }
     }
 
-    // ── 라이선스 등급 ──────────────────────────────────────
-
-    @Getter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class LicenseTierResponse {
-        private Long id;
-        private Long courseId;
-        private LicenseTier.Tier tier;
-        private BigDecimal price;
-        private String description;
-
-        public static LicenseTierResponse from(LicenseTier licenseTier) {
-            return LicenseTierResponse.builder()
-                    .id(licenseTier.getId())
-                    .courseId(licenseTier.getCourseId())
-                    .tier(licenseTier.getTier())
-                    .price(licenseTier.getPrice())
-                    //.description(licenseTier.getDescription())
-                    .build();
-        }
-    }
-
     // ── 워터마크 검증 ──────────────────────────────────────
 
     /** 유출 사본의 출처 확인 결과 */
@@ -135,50 +111,6 @@ public class CourseDto {
         private Boolean checksumMatched;
 
         private String message;
-    }
-
-    // ── 판매 대시보드 ──────────────────────────────────────
-
-    @Getter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class SalesItemResponse {
-        private Long courseId;
-        private String title;
-        private Course.Category category;
-        private BigDecimal price;
-        private Integer salesCount;
-        private BigDecimal revenue;
-        private Integer downloadCount;
-        private String thumbnailUrl;
-
-        public static SalesItemResponse from(Course course, Integer salesCount, BigDecimal revenue) {
-            return SalesItemResponse.builder()
-                    .courseId(course.getId())
-                    .title(course.getTitle())
-                    .category(course.getCategory())
-                    .price(course.getPrice() == null ? BigDecimal.ZERO : course.getPrice())
-                    .salesCount(salesCount == null ? 0 : salesCount)
-                    .revenue(revenue == null ? BigDecimal.ZERO : revenue)
-                    .downloadCount(course.getDownloadCount())
-                    .thumbnailUrl(course.hasAsset()
-                            ? "/api/courses/" + course.getId() + "/asset/preview"
-                            : null)
-                    .build();
-        }
-    }
-
-    @Getter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class SalesDashboardResponse {
-        private Long instructorId;
-        private Integer designCount;
-        private Integer totalSalesCount;
-        private BigDecimal totalRevenue;
-        private List<SalesItemResponse> items;
     }
 
     // 공통 API 응답 래퍼
@@ -306,7 +238,7 @@ public class CourseDto {
         @Builder
         public static class TierPrice {
             @NotNull(message = "등급은 필수입니다")
-            private com.lecture.course.entity.LicenseTier.Tier tier;
+            private LicenseTier.Tier tier;
 
             @NotNull(message = "가격은 필수입니다")
             @PositiveOrZero(message = "가격은 0 이상이어야 합니다")

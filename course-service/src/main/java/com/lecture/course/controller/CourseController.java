@@ -175,14 +175,30 @@ public class CourseController {
                 CourseDto.ApiResponse.success(courseService.getMySales(instructorId))
         );
     }
+
+    /**
+     * GET /courses/{id}/license-tiers - 라이선스 등급 목록 조회
+     */
+    @GetMapping("/{id}/license-tiers")
+    public ResponseEntity<CourseDto.ApiResponse<List<CourseDto.LicenseTierResponse>>> getLicenseTiers(
+            @PathVariable Long id) {
+        return ResponseEntity.ok(
+                CourseDto.ApiResponse.success(courseService.getLicenseTiers(id))
+        );
+    }
+
+    /**
+     * POST /courses/{id}/license-tiers - 라이선스 등급별 가격 등록 (디자이너 본인만)
+     */
     @PostMapping("/{id}/license-tiers")
     public ResponseEntity<CourseDto.ApiResponse<List<CourseDto.LicenseTierResponse>>> registerLicenseTiers(
             @PathVariable Long id,
             @Valid @RequestBody CourseDto.LicenseTierRegisterRequest request,
             @RequestHeader("X-User-Id") Long instructorId) {
-
-        return ResponseEntity.ok(CourseDto.ApiResponse.success(
-                courseService.registerLicenseTiers(id, request, instructorId)));
+        return ResponseEntity.ok(
+                CourseDto.ApiResponse.success(
+                        courseService.registerLicenseTiers(id, request, instructorId))
+        );
     }
 
     /** 내부 호출: Enrollment Service가 구매 시점에 등급 가격 조회 */
