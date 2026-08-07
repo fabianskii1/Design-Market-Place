@@ -20,22 +20,22 @@ export default defineConfig({
         secure: false
       },
       '/oauth2': {
-        target: 'http://localhost:9000',
+        target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false
       },
       '/login': {
-        target: 'http://localhost:9000',
+        target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false
       },
       '/logout': {
-        target: 'http://localhost:9000',
+        target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false
       },
       '/userinfo': {
-        target: 'http://localhost:9000',
+        target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false
       }
