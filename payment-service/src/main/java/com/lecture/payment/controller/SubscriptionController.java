@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/subscriptions")
+@RequestMapping("/api/payments/subscriptions")
 @RequiredArgsConstructor
 public class SubscriptionController {
 

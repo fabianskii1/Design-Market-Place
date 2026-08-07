@@ -145,7 +145,7 @@ public class PaymentServiceClient {
                             .scheme("http")
                             .host("payment-service")
                             .port(8084)
-                            .path("/api/subscriptions/internal/subscriber-count/{id}")
+                            .path("/api/payments/subscriptions/internal/subscriber-count/{id}")
                             .build(instructorId))
                     .retrieve()
                     .bodyToMono(Long.class)

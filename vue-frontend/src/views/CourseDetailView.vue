@@ -91,6 +91,35 @@
                 </span>
               </div>
 
+              <!-- 라이선스 등급 선택 -->
+              <div class="license-select">
+                <label
+                  v-for="tier in mergedTiers"
+                  :key="tier.tier"
+                  class="license-option"
+                  :class="{ active: selectedTier === tier.tier }"
+                >
+                  <input
+                    type="radio"
+                    class="license-radio"
+                    name="license-tier"
+                    :value="tier.tier"
+                    v-model="selectedTier"
+                  />
+                  <div class="license-body">
+                    <div class="license-top">
+                      <span class="license-label">{{ tier.label }}</span>
+                      <span class="license-price">
+                        <span v-if="tier.discounted" class="license-price-original">₩{{ Number(tier.originalPrice).toLocaleString() }}</span>
+                        ₩{{ Number(tier.price).toLocaleString() }}
+                      </span>
+                    </div>
+                    <p class="license-summary">{{ tier.summary }}</p>
+                  </div>
+                </label>
+                <p class="license-common">{{ COMMON_CLAUSE }}</p>
+              </div>
+
               <button
                 class="btn btn-primary btn-full"
                 @click="handlePrimaryAction"
@@ -444,7 +473,7 @@ async function loadLicenseTiers() {
 /**
  * 구독은 디자이너별 가격 설정이 아니라 고정 정책(월 9,900원 / 30% 할인)이라
  * 이 디자이너의 가격을 따로 조회할 필요가 없다. 내가 이 디자이너를 이미
- * 구독 중인지만 /api/subscriptions/my 로 확인한다.
+ * 구독 중인지만 /api/payments/subscriptions/my 로 확인한다.
  */
 async function loadInstructorSubscriptionInfo() {
   const designerId = course.value?.instructorId ?? course.value?.instructor_id

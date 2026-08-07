@@ -10,18 +10,20 @@ import api from './index.js'
 export const SUBSCRIPTION_MONTHLY_PRICE = 9900
 export const SUBSCRIPTION_DISCOUNT_RATE = 0.3
 
+// 게이트웨이가 /api/subscriptions/** 를 라우팅해주지 않아 (고정 라우팅: /api/{users,courses,enrollments,payments,recommend}/**),
+// SubscriptionController를 payment-service 안에서 /api/payments/subscriptions 밑으로 옮겼다.
 export const subscriptionApi = {
-  // POST /api/subscriptions  body: { designerId }
+  // POST /api/payments/subscriptions  body: { designerId }
   subscribe(designerId) {
-    return api.post('/api/subscriptions', { designerId })
+    return api.post('/api/payments/subscriptions', { designerId })
   },
-  // DELETE /api/subscriptions/{designerId}
+  // DELETE /api/payments/subscriptions/{designerId}
   cancel(designerId) {
-    return api.delete(`/api/subscriptions/${designerId}`)
+    return api.delete(`/api/payments/subscriptions/${designerId}`)
   },
-  // GET /api/subscriptions/my
+  // GET /api/payments/subscriptions/my
   getMySubscriptions() {
-    return api.get('/api/subscriptions/my')
+    return api.get('/api/payments/subscriptions/my')
   }
 }
 

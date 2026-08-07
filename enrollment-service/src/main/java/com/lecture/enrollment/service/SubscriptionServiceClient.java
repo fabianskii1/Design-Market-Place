@@ -22,7 +22,7 @@ public class SubscriptionServiceClient {
                     .get()
                     .uri(uriBuilder -> uriBuilder
                             .scheme("http").host("payment-service").port(8084)
-                            .path("/api/subscriptions/internal/discount")
+                            .path("/api/payments/subscriptions/internal/discount")
                             .queryParam("userId", userId)
                             .queryParam("designerId", designerId)
                             .build())
