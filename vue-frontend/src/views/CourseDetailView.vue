@@ -601,6 +601,78 @@ watch(
   color: var(--color-primary);
 }
 
+.license-select {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.license-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border, #d7dbe3);
+  border-radius: var(--radius-md, 10px);
+  cursor: pointer;
+  transition: var(--transition, all 0.15s ease);
+}
+
+.license-option:hover {
+  border-color: var(--color-primary, #2d5bd7);
+  background: var(--color-bg-tertiary, #eef2fb);
+}
+
+.license-option.active {
+  border-color: var(--color-primary, #2d5bd7);
+  background: var(--color-primary-light, #eaf0ff);
+}
+
+.license-radio {
+  margin-top: 3px;
+  accent-color: var(--color-primary, #2d5bd7);
+  flex-shrink: 0;
+}
+
+.license-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.license-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.license-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary, #1e2430);
+}
+
+.license-price {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-primary, #2d5bd7);
+  white-space: nowrap;
+}
+
+.license-summary {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--color-text-secondary, #5b6475);
+  line-height: 1.5;
+}
+
+.license-common {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--color-text-muted, #8b93a3);
+  line-height: 1.5;
+}
+
 .btn-full {
   width: 100%;
   padding: 13px;
