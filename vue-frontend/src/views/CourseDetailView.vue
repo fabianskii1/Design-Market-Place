@@ -53,10 +53,7 @@
                 </label>
                 <p class="license-common">{{ COMMON_CLAUSE }}</p>
               </div>
-              <button
-                class="btn btn-primary btn-full"
-
-
+             
               <button
                 class="btn btn-primary btn-full"
                 @click="handlePrimaryAction"
