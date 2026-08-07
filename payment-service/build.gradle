@@ -14,6 +14,8 @@ java {
 }
 
 repositories {
+    // Google이 운영하는 Maven Central 미러. 본진이 429를 뱉을 때 대체 경로가 된다.
+    maven { url 'https://maven-central-asia.storage-download.googleapis.com/maven2/' }
     mavenCentral()
 }
 

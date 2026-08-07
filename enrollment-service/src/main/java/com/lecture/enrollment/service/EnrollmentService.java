@@ -26,28 +26,38 @@ public class EnrollmentService {
     private final PaymentServiceClient paymentServiceClient;
     private final EnrollmentKafkaProducer kafkaProducer;
     private final EnrollmentWriteService enrollmentWriteService;
+    private final SubscriptionServiceClient subscriptionServiceClient;
 
     /**
      * 수강신청 전체 흐름
      * 1. 강의 존재 확인
      * 2. 중복 수강 확인
-     * 3. Enrollment 생성 및 즉시 커밋 (PENDING)
-     * 4. 결제 요청
+     * 3. 라이선스 등급 가격 조회 + 구독 할인 적용
+     * 4. Enrollment 생성 및 즉시 커밋 (PENDING)
+     * 5. 결제 요청
      */
-    public EnrollmentDto.EnrollmentResponse enroll(Long userId, Long courseId) {
+    public EnrollmentDto.EnrollmentResponse enroll(Long userId, Long courseId, Long licenseTierId) {
         if (!courseServiceClient.existsCourse(courseId)) {
-            throw new IllegalArgumentException("존재하지 않는 강의입니다: " + courseId);
+            throw new IllegalArgumentException("존재하지 않는 디자인입니다: " + courseId);
         }
-
         if (enrollmentRepository.existsByUserIdAndCourseId(userId, courseId)) {
-            throw new IllegalArgumentException("이미 수강신청한 강의입니다");
+            throw new IllegalArgumentException("이미 구매한 디자인입니다");
         }
 
-        Enrollment enrollment = enrollmentWriteService.createPendingEnrollment(userId, courseId);
+        CourseServiceClient.LicenseTierInfo tier = courseServiceClient.getLicenseTier(courseId, licenseTierId);
+        Map<String, Object> course = courseServiceClient.getCourse(courseId);
+        Long instructorId = toLong(course.get("instructorId"));
 
-        paymentServiceClient.requestPayment(userId, courseId, BigDecimal.valueOf(99000));
+        BigDecimal finalPrice = subscriptionServiceClient.applyDiscountIfSubscribed(
+                userId, instructorId, tier.getPrice());
 
-        log.info("[EnrollmentService] 수강신청 완료 (결제 대기) - enrollmentId: {}", enrollment.getId());
+        Enrollment enrollment = enrollmentWriteService.createPendingEnrollment(
+                userId, courseId, licenseTierId, finalPrice);
+
+        paymentServiceClient.requestPayment(userId, courseId, licenseTierId, finalPrice);
+
+        log.info("[EnrollmentService] 구매 신청 완료 - enrollmentId: {}, tier: {}, amount: {}",
+                enrollment.getId(), tier.getTier(), finalPrice);
         return EnrollmentDto.EnrollmentResponse.from(enrollment);
     }
 
@@ -69,6 +79,16 @@ public class EnrollmentService {
                         .enrollmentId(enrollment.getId())
                         .userId(userId)
                         .courseId(courseId)
+                        .build()
+        );
+
+        // 구매 확정 → 구매자별 워터마크 사본 생성 요청
+        kafkaProducer.publishPurchaseCompleted(
+                KafkaEvent.PurchaseCompletedEvent.builder()
+                        .purchaseId(enrollment.getId())
+                        .buyerId(userId)
+                        .courseId(courseId)
+                        .occurredAt(java.time.Instant.now().getEpochSecond())
                         .build()
         );
 

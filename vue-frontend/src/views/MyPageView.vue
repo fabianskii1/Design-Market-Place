@@ -38,8 +38,8 @@
           <div class="profile-info">
             <h2 class="profile-name">{{ auth.user?.name || '사용자' }}</h2>
             <p class="profile-email">{{ auth.user?.email || '-' }}</p>
-            <span class="badge" :class="isInstructor ? 'badge-amber' : 'badge-blue'">
-              {{ isInstructor ? '강사' : '학생' }}
+            <span v-if="isInstructor" class="badge badge-amber">
+              디자이너
             </span>
           </div>
         </div>
@@ -75,89 +75,101 @@
           </p>
         </section>
 
-        <!-- 강사 화면 -->
+        <!-- 디자이너 화면 -->
         <section v-else class="instructor-section">
           <div class="section-head">
-            <h3 class="section-title">내가 등록한 디자인</h3>
-            <span class="section-subtitle">등록한 디자인과 디자인별 구매자 수를 확인할 수 있습니다.</span>
+            <h3 class="section-title">마이페이지</h3>
+            <span class="section-subtitle">디자인 현황과 매출을 관리할 수 있습니다.</span>
           </div>
 
-          <div class="summary-cards">
-            <div class="summary-card">
-              <div class="summary-label">등록 디자인 수</div>
-              <div class="summary-value">{{ myCourses.length }}</div>
-            </div>
-            <div class="summary-card">
-              <div class="summary-label">총 구매자 수</div>
-              <div class="summary-value">{{ totalEnrollmentCount }}</div>
-            </div>
+          <div class="tab-nav">
+            <button
+              class="tab-btn"
+              :class="{ active: activeTab === 'courses' }"
+              @click="activeTab = 'courses'"
+            >내 디자인</button>
+            <button
+              class="tab-btn"
+              :class="{ active: activeTab === 'sales' }"
+              @click="activeTab = 'sales'"
+            >판매 현황</button>
           </div>
 
-          <div v-if="instructorLoading" class="loading-row instructor-loading">
-            <div v-for="i in 3" :key="i" class="skeleton-card">
-              <div class="skeleton-thumb"></div>
-              <div class="skeleton-body">
-                <div class="skeleton-line short"></div>
-                <div class="skeleton-line"></div>
+          <template v-if="activeTab === 'courses'">
+            <div class="summary-cards">
+              <div class="summary-card">
+                <div class="summary-label">등록 디자인 수</div>
+                <div class="summary-value">{{ myCourses.length }}</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">총 구매자 수</div>
+                <div class="summary-value">{{ totalEnrollmentCount }}</div>
               </div>
             </div>
-          </div>
 
-          <div v-else-if="myCourses.length" class="instructor-course-list fade-in">
-            <div
-              v-for="course in myCourses"
-              :key="course.id"
-              class="instructor-course-card"
-            >
-              <div class="course-card-top">
-                <div>
-                  <h4 class="course-title">{{ course.title }}</h4>
-                  <p class="course-desc">{{ course.description || '설명이 없습니다.' }}</p>
+            <div v-if="instructorLoading" class="loading-row instructor-loading">
+              <div v-for="i in 3" :key="i" class="skeleton-card">
+                <div class="skeleton-thumb"></div>
+                <div class="skeleton-body">
+                  <div class="skeleton-line short"></div>
+                  <div class="skeleton-line"></div>
                 </div>
-                <span
-                  class="status-badge"
-                  :class="course.status === 'ACTIVE' ? 'status-active' : 'status-inactive'"
-                >
-                  {{ course.status || 'UNKNOWN' }}
-                </span>
               </div>
+            </div>
 
-              <div class="course-meta-grid">
-                <div class="meta-box">
-                  <div class="meta-label">카테고리</div>
-                  <div class="meta-value">{{ course.category || '-' }}</div>
+            <div v-else-if="myCourses.length" class="instructor-course-list fade-in">
+              <div
+                v-for="course in myCourses"
+                :key="course.id"
+                class="instructor-course-card"
+              >
+                <div class="course-card-top">
+                  <div>
+                    <h4 class="course-title">{{ course.title }}</h4>
+                    <p class="course-desc">{{ course.description || '설명이 없습니다.' }}</p>
+                  </div>
+                  <span
+                    class="status-badge"
+                    :class="course.status === 'ACTIVE' ? 'status-active' : 'status-inactive'"
+                  >
+                    {{ course.status || 'UNKNOWN' }}
+                  </span>
                 </div>
-                <div class="meta-box">
-                  <div class="meta-label">가격</div>
-                  <div class="meta-value">{{ formatPrice(course.price) }}</div>
-                </div>
-                <div class="meta-box">
-                  <div class="meta-label">구매자 수</div>
-                  <div class="meta-value">
-                    {{ course.enrollment_count ?? course.enrollmentCount ?? 0 }}명
+
+                <div class="course-meta-grid">
+                  <div class="meta-box">
+                    <div class="meta-label">카테고리</div>
+                    <div class="meta-value">{{ categoryLabel(course.category) || '-' }}</div>
+                  </div>
+                  <div class="meta-box">
+                    <div class="meta-label">가격</div>
+                    <div class="meta-value">{{ formatPrice(course.price) }}</div>
+                  </div>
+                  <div class="meta-box">
+                    <div class="meta-label">구매자 수</div>
+                    <div class="meta-value">
+                      {{ course.enrollment_count ?? course.enrollmentCount ?? 0 }}명
+                    </div>
+                  </div>
+                  <div class="meta-box">
+                    <div class="meta-label">디자인 ID</div>
+                    <div class="meta-value">#{{ course.id }}</div>
                   </div>
                 </div>
-                <div class="meta-box">
-                  <div class="meta-label">디자인 ID</div>
-                  <div class="meta-value">#{{ course.id }}</div>
+
+                <div class="course-card-actions">
+                  <router-link :to="`/courses/${course.id}`" class="action-btn action-primary">
+                    디자인 보기
+                  </router-link>
                 </div>
               </div>
-
-              <div class="course-card-actions">
-                <router-link :to="`/courses/${course.id}`" class="action-btn action-primary">
-                  디자인 보기
-                </router-link>
-              </div>
             </div>
-          </div>
 
-          <p v-else-if="instructorError" class="empty-text">
-            {{ instructorError }}
-          </p>
+            <p v-else-if="instructorError" class="empty-text">{{ instructorError }}</p>
+            <p v-else class="empty-text">아직 등록한 디자인이 없습니다.</p>
+          </template>
 
-          <p v-else class="empty-text">
-            아직 등록한 디자인이 없습니다.
-          </p>
+          <SalesTab v-else-if="activeTab === 'sales'" />
         </section>
       </main>
     </div>
@@ -172,6 +184,8 @@ import CourseCard from '@/components/CourseCard.vue'
 import { useAuthStore } from '@/store/auth.js'
 import { enrollmentApi } from '@/api/enrollment.js'
 import { courseApi } from '@/api/course.js'
+import { categoryLabel } from '@/api/category.js'
+import SalesTab from '@/components/SalesTab.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -184,10 +198,11 @@ const recommendLoading = ref(true)
 const recommendError = ref('')
 const recommendMessage = ref('')
 
-/* 강사용 */
+/* 디자이너용 */
 const myCourses = ref([])
 const instructorLoading = ref(true)
 const instructorError = ref('')
+const activeTab = ref('courses') // 'courses' | 'sales'
 
 const totalEnrollmentCount = computed(() =>
   myCourses.value.reduce((sum, course) => {
@@ -208,7 +223,7 @@ function formatPrice(price) {
 }
 
 /**
- * course 객체에서 강사 식별자 추출
+ * course 객체에서 디자이너 식별자 추출
  */
 function getCourseInstructorId(course) {
   return (
@@ -225,13 +240,13 @@ async function loadStudentRecommendations() {
   try {
     if (!auth.user) {
       console.warn('[MyPage] auth.user is missing')
-      recommendError.value = '추천 강의를 준비 중입니다.'
+      recommendError.value = '추천 디자인을 준비 중입니다.'
       return
     }
 
     if (!auth.user.id) {
       console.warn('[MyPage] auth.user.id is missing:', auth.user)
-      recommendError.value = '추천 강의를 준비 중입니다.'
+      recommendError.value = '추천 디자인을 준비 중입니다.'
       return
     }
 
@@ -240,15 +255,17 @@ async function loadStudentRecommendations() {
 
     const payload = res.data
 
+    const RECOMMEND_MESSAGE = '최근에 구매했던 디자이너의 제품과 구매했던 제품과 유사한 디자인을 추천합니다.'
+
     if (Array.isArray(payload?.recommendedCourses)) {
       recommendations.value = payload.recommendedCourses
-      recommendMessage.value = payload.message ?? ''
+      recommendMessage.value = RECOMMEND_MESSAGE
     } else if (Array.isArray(payload?.data)) {
       recommendations.value = payload.data
-      recommendMessage.value = payload.message ?? ''
+      recommendMessage.value = RECOMMEND_MESSAGE
     } else if (Array.isArray(payload)) {
       recommendations.value = payload
-      recommendMessage.value = ''
+      recommendMessage.value = RECOMMEND_MESSAGE
     } else {
       console.warn('[MyPage] unexpected recommendation response shape:', payload)
       recommendations.value = []
@@ -256,7 +273,7 @@ async function loadStudentRecommendations() {
     }
   } catch (error) {
     console.error('[MyPage] failed to load recommendations:', error)
-    recommendError.value = '현재 추천 강의를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
+    recommendError.value = '현재 추천 디자인을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
   } finally {
     recommendLoading.value = false
   }
@@ -266,13 +283,13 @@ async function loadInstructorCourses() {
   try {
     if (!auth.user) {
       console.warn('[MyPage] instructor auth.user is missing')
-      instructorError.value = '강좌 정보를 불러오지 못했습니다.'
+      instructorError.value = '디자인 정보를 불러오지 못했습니다.'
       return
     }
 
     if (!auth.user.id) {
       console.warn('[MyPage] instructor auth.user.id is missing:', auth.user)
-      instructorError.value = '강좌 정보를 불러오지 못했습니다.'
+      instructorError.value = '디자인 정보를 불러오지 못했습니다.'
       return
     }
 
@@ -315,7 +332,7 @@ async function loadInstructorCourses() {
     console.log('[MyPage] filtered myCourses =', myCourses.value)
   } catch (error) {
     console.error('[MyPage] failed to load instructor courses:', error)
-    instructorError.value = '현재 강좌 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
+    instructorError.value = '현재 디자인 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
   } finally {
     instructorLoading.value = false
   }
@@ -475,6 +492,36 @@ onMounted(async () => {
   flex-direction: column;
   gap: 6px;
   margin-bottom: 12px;
+}
+
+.tab-nav {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tab-btn {
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: var(--transition);
+}
+
+.tab-btn:hover {
+  color: var(--color-text-primary);
+}
+
+.tab-btn.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+  font-weight: 600;
 }
 
 .section-title {
@@ -715,4 +762,5 @@ onMounted(async () => {
     grid-template-columns: 1fr;
   }
 }
+
 </style>

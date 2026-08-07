@@ -130,7 +130,7 @@ function handleLogout() {
 }
 
 onMounted(async () => {
-  // 강사는 이 페이지 접근 불가 → 마이페이지로 이동
+  // 디자이너는 이 페이지 접근 불가 → 마이페이지로 이동
   if (isInstructor.value) {
     console.warn('[EnrollmentView] instructor tried to access /enrollments, redirect to /mypage')
     router.replace('/mypage')

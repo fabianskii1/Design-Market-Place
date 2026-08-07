@@ -12,6 +12,18 @@ api.interceptors.request.use((config) => {
   if (auth.accessToken) {
     config.headers.Authorization = `Bearer ${auth.accessToken}`
   }
+
+  // 파일 업로드(FormData)는 Content-Type을 지워야 한다.
+  // 인스턴스 기본값(application/json)이 남으면 boundary가 붙지 않아
+  // 서버가 파트를 파싱하지 못하고 400/500을 반환한다.
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    if (typeof config.headers.delete === 'function') {
+      config.headers.delete('Content-Type')
+    } else {
+      delete config.headers['Content-Type']
+    }
+  }
+
   return config
 })
 

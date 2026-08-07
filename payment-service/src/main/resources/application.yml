@@ -37,6 +37,12 @@ spring:
       properties:
         spring.json.add.type.headers: false
 
+# 구독 정책 (SubscriptionService의 @Value("${subscription.monthly-price}") / @Value("${subscription.discount-rate}")가 읽는 값)
+# spring: 블록 밖, 최상위(root)에 있어야 한다 — spring 아래에 넣으면 spring.subscription.* 으로 바인딩돼서 안 읽힌다.
+subscription:
+  monthly-price: 9900
+  discount-rate: 0.30
+
 eureka:
   client:
     service-url:

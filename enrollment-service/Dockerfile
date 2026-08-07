@@ -8,11 +8,14 @@ COPY gradle gradle
 COPY build.gradle .
 COPY settings.gradle .
 RUN chmod +x gradlew
-RUN ./gradlew dependencies --no-daemon
+# Gradle 홈을 빌드 간에 유지한다. 실패해도 받아둔 jar 가 남아 재시도 비용이 줄어든다.
+RUN --mount=type=cache,target=/root/.gradle \
+    ./gradlew dependencies --no-daemon
 
 # 소스 복사 및 빌드
 COPY src src
-RUN ./gradlew bootJar -x test --no-daemon
+RUN --mount=type=cache,target=/root/.gradle \
+    ./gradlew bootJar -x test --no-daemon
 
 # 2단계: 실행 환경 (JRE만 포함 - 이미지 경량화)
 FROM eclipse-temurin:21-jre-alpine

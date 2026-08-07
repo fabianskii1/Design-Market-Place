@@ -21,6 +21,13 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.MariaDBDialect
 
+  # 파일 업로드 제한 (기본값 1MB 라서 이미지가 바로 막힌다)
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 12MB
+
   security:
     oauth2:
       resourceserver:
@@ -39,6 +46,12 @@ eureka:
 service:
   user-service:
     url: http://user-service
+  watermark-service:
+    url: http://watermark-service:8086
+
+# 디자인 자산 저장 경로 (docker-compose 에서 볼륨으로 마운트)
+storage:
+  location: /app/uploads
 
 springdoc:
   api-docs:

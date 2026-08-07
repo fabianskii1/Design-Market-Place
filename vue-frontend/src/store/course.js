@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { courseApi } from '@/api/course.js'
+import { CATEGORY_OPTIONS, categoryLabel } from '@/api/category.js'
 
 export const useCourseStore = defineStore('course', () => {
   const courses = ref([])
@@ -9,17 +10,7 @@ export const useCourseStore = defineStore('course', () => {
   const error = ref(null)
   const selectedCategory = ref('전체')
 
-
-  // 백엔드 카테고리 → 프론트 표시용 카테고리
-  const categoryLabelMap = {
-    BACKEND: '로고 / 브랜딩',
-    FRONTEND: 'UX / UI 키트',
-    DEVOPS: '일러스트',
-    DATA: '아이콘',
-    DATA_SCIENCE: '템플릿'   
-  }
-
-  const categories = ['전체', ...Object.values(categoryLabelMap)]
+ const categories = ['전체', ...CATEGORY_OPTIONS.map(c => c.label)]
   // 썸네일 이미지 매핑
   const thumbnailMap = {
     SPRING: new URL('../assets/images/courses/spring_boot.png', import.meta.url).href,
@@ -38,8 +29,8 @@ export const useCourseStore = defineStore('course', () => {
   }
 
   function normalizeCategory(category) {
-    if (!category) return ''
-    return categoryLabelMap[category] || category
+  if (!category) return ''
+  return categoryLabel(category)
   }
 
   function normalizeCourse(course) {
@@ -123,7 +114,6 @@ export const useCourseStore = defineStore('course', () => {
     categories,
     selectedCategory,
     thumbnailMap,
-    categoryLabelMap,
     normalizeCategory,
     normalizeCourse,
     getThumbnail,

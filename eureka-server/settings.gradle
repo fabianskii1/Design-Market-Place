@@ -1,1 +1,18 @@
+// Maven Central 레이트 리밋(429) 우회용 미러.
+// 플러그인 클래스패스는 pluginManagement 에서 해석되므로 여기에도 넣어야 한다.
+pluginManagement {
+    repositories {
+        maven { url 'https://maven-central-asia.storage-download.googleapis.com/maven2/' }
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+dependencyResolutionManagement {
+    repositories {
+        maven { url 'https://maven-central-asia.storage-download.googleapis.com/maven2/' }
+        mavenCentral()
+    }
+}
+
 rootProject.name = 'eureka-server'

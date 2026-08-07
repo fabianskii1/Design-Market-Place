@@ -2,6 +2,7 @@ package com.lecture.payment.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.DynamicInsert;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -9,12 +10,18 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * @DynamicInsert: courseId/licenseTierId가 null인 구독 결제를 저장할 때
+ * INSERT 문에서 그 컬럼들을 아예 빼도록 한다. (null을 명시적으로 바인딩하는 방식에서
+ * "Field ... doesn't have a default value" 류의 원인 불명 오류가 반복 발생해 우회함)
+ */
 @Entity
 @Table(name = "payments")
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@DynamicInsert
 @EntityListeners(AuditingEntityListener.class)
 public class Payment {
 
@@ -25,8 +32,18 @@ public class Payment {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(name = "course_id", nullable = false)
+    @Column(name = "course_id") // 기존 nullable = false 제거 (구독 결제는 courseId 없음)
     private Long courseId;
+
+    @Column(name = "license_tier_id")
+    private Long licenseTierId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_type", length = 20)
+    @Builder.Default
+    private PaymentType paymentType = PaymentType.ENROLLMENT;
+
+    public enum PaymentType { ENROLLMENT, SUBSCRIPTION }
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;

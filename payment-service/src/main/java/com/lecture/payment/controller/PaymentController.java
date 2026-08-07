@@ -48,4 +48,31 @@ public class PaymentController {
         return ResponseEntity.ok(
                 PaymentDto.ApiResponse.success(paymentService.getPaymentsByUser(userId)));
     }
+
+    /**
+     * GET /payments/internal/sales?courseIds=1,2,3 - 강의별 판매 집계 (course-service 호출용)
+     */
+    @GetMapping("/internal/sales")
+    public ResponseEntity<List<PaymentDto.CourseSalesSummary>> getSalesSummary(
+            @RequestParam List<Long> courseIds) {
+        return ResponseEntity.ok(paymentService.getSalesSummary(courseIds));
+    }
+
+    /**
+     * GET /payments/internal/sales/monthly?courseIds=1,2,3 - 강의별 월별 매출 (course-service 호출용)
+     */
+    @GetMapping("/internal/sales/monthly")
+    public ResponseEntity<List<PaymentDto.MonthlySales>> getMonthlySales(
+            @RequestParam List<Long> courseIds) {
+        return ResponseEntity.ok(paymentService.getMonthlySales(courseIds));
+    }
+
+    /**
+     * GET /payments/internal/sales/by-license-tier?courseIds=1,2,3 - 강의별·등급별 판매 집계 (course-service 호출용)
+     */
+    @GetMapping("/internal/sales/by-license-tier")
+    public ResponseEntity<List<PaymentDto.LicenseTierSales>> getLicenseTierSales(
+            @RequestParam List<Long> courseIds) {
+        return ResponseEntity.ok(paymentService.getLicenseTierSales(courseIds));
+    }
 }

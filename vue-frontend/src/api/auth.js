@@ -1,7 +1,7 @@
 import api from './index.js'
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8008'
 
 export const authApi = {
   // OAuth2 Authorization Code -> Access Token 교환
