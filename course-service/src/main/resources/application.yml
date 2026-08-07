@@ -46,6 +46,8 @@ eureka:
 service:
   user-service:
     url: http://user-service
+  watermark-service:
+    url: http://watermark-service:8086
 
 # 디자인 자산 저장 경로 (docker-compose 에서 볼륨으로 마운트)
 storage:

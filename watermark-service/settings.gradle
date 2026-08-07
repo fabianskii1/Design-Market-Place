@@ -15,4 +15,4 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = 'payment-service'
+rootProject.name = 'watermark-service'

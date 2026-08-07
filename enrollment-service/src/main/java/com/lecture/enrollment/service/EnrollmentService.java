@@ -76,6 +76,16 @@ public class EnrollmentService {
                         .build()
         );
 
+        // 구매 확정 → 구매자별 워터마크 사본 생성 요청
+        kafkaProducer.publishPurchaseCompleted(
+                KafkaEvent.PurchaseCompletedEvent.builder()
+                        .purchaseId(enrollment.getId())
+                        .buyerId(userId)
+                        .courseId(courseId)
+                        .occurredAt(java.time.Instant.now().getEpochSecond())
+                        .build()
+        );
+
         log.info("[EnrollmentService] 수강 활성화 완료 - enrollmentId: {}", enrollment.getId());
     }
 

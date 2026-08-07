@@ -62,7 +62,12 @@
             <p v-if="assetSrc" class="watermark-note">워터마크가 적용된 미리보기입니다.</p>
 
             <div class="enroll-body">
-              <div class="enroll-price">₩{{ displayPrice }}</div>
+              <div class="enroll-price-row">
+                <div class="enroll-price">₩{{ displayPrice }}</div>
+                <span class="download-badge" :title="`다운로드 ${displayDownloadCount}회`">
+                  <span aria-hidden="true">⬇</span> {{ displayDownloadCount }}
+                </span>
+              </div>
 
               <button
                 class="btn btn-primary btn-full"
@@ -256,6 +261,20 @@ const displayEnrollmentCount = computed(() => {
   return Number.isNaN(value) ? 0 : value.toLocaleString()
 })
 
+/**
+ * 다운로드 수. downloadCount 가 없으면 enrollmentCount 를 재활용한다.
+ * (구매 1건 = 다운로드 1회)
+ */
+const displayDownloadCount = computed(() => {
+  const value = Number(
+    course.value?.downloadCount ??
+    course.value?.enrollmentCount ??
+    course.value?.enrollment_count ??
+    0
+  )
+  return Number.isNaN(value) ? '0' : value.toLocaleString()
+})
+
 const displayPrice = computed(() => {
   const value = Number(course.value?.price ?? 0)
   return Number.isNaN(value) ? '0' : value.toLocaleString()
@@ -398,7 +417,7 @@ const helperText = computed(() => {
     return '수강 신청이 접수되었습니다. 결제/처리 상태가 반영되면 내 수강 목록에서 확인할 수 있습니다.'
   }
 
-  return '결제를 진행하면 수강 신청이 함께 처리됩니다.'
+  return '해당 창작물은 저작법에 보호를 받으며 무단 배포시 처벌 대상이 될 수 있습니다.'
 })
 
 async function loadEnrollmentStatus() {
@@ -488,6 +507,24 @@ watch(
 </script>
 
 <style scoped>
+/* ── 다운로드 수 ───────────────────────────────── */
+.enroll-price-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.download-badge {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--color-text-muted, #8b93a3);
+  background: var(--color-bg-tertiary, #eef2fb);
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
 /* ── 디자이너 연락처 ───────────────────────────── */
 .designer-box {
   display: flex;

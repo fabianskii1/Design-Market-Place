@@ -90,6 +90,20 @@ public class CourseController {
     }
 
     /**
+     * GET /courses/internal/{id}/asset/original - 판매용 원본 바이트
+     *
+     * watermark-service 가 구매자별 사본을 만들 때 원본을 가져가는 통로다.
+     * 파일시스템을 공유하지 않고 HTTP 로 주고받기 위해 열어 둔다.
+     * internal 경로라 게이트웨이를 통해서는 노출되지 않는다.
+     */
+    @GetMapping("/internal/{id}/asset/original")
+    public ResponseEntity<Resource> internalOriginal(@PathVariable Long id) {
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .body(courseService.loadOriginalInternal(id));
+    }
+
+    /**
      * POST /courses/assets/verify - 유출 사본 검증
      *
      * 비가시적 워터마크를 추출해 어느 디자인·누구 소유였는지 확인한다.

@@ -4,10 +4,12 @@ import com.lecture.course.dto.CourseDto;
 import com.lecture.course.entity.Course;
 import com.lecture.course.exception.AssetAccessDeniedException;
 import com.lecture.course.exception.AssetNotFoundException;
+import com.lecture.course.client.WatermarkClient;
 import com.lecture.course.repository.CourseRepository;
 import com.lecture.course.repository.LicenseTierRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +34,7 @@ public class CourseService {
     private final PaymentServiceClient paymentServiceClient;
     private final EnrollmentServiceClient enrollmentServiceClient;
     private final FileStorageService fileStorageService;
-    private final WatermarkService watermarkService;
+    private final WatermarkClient watermarkClient;
 
     /**
      * 디자인 등록 (디자이너만 가능 - SecurityConfig에서 role 검증)
@@ -77,17 +79,18 @@ public class CourseService {
         // user-service 연동이 붙으면 디자이너명으로 바꾸면 된다.
         String ownerLabel = course.getTitle();
 
-        WatermarkService.WatermarkResult result =
-                watermarkService.process(uploaded, courseId, instructorId, ownerLabel);
+        // 워터마크 가공은 watermark-service 가 담당한다. 이 서비스는 저장만 맡는다.
+        byte[] originalBytes = watermarkClient.createOriginal(uploaded, courseId, instructorId);
+        byte[] previewBytes = watermarkClient.createPreview(uploaded, courseId, instructorId, ownerLabel);
 
         // 교체 업로드면 이전 파일을 정리한다
         String previousOriginal = course.getOriginalUrl();
         String previousWatermark = course.getWatermarkUrl();
 
-        String originalName = fileStorageService.storePng(courseId, result.originalBytes(), "original");
-        String previewName = fileStorageService.storePng(courseId, result.previewBytes(), "preview");
+        String originalName = fileStorageService.storePng(courseId, originalBytes, "original");
+        String previewName = fileStorageService.storePng(courseId, previewBytes, "preview");
 
-        course.updateAssets(originalName, previewName, result.checksum());
+        course.updateAssets(originalName, previewName, sha256(originalBytes));
 
         fileStorageService.deleteQuietly(previousOriginal);
         fileStorageService.deleteQuietly(previousWatermark);
@@ -140,6 +143,32 @@ public class CourseService {
             course.increaseDownloadCount();
         }
 
+        // 구매자에게는 본인 ID가 심긴 사본을 준다. 유출 시 경로를 특정하기 위함이다.
+        // 이벤트 처리가 아직 안 끝났으면 원본으로 폴백해 다운로드 자체는 막지 않는다.
+        if (!isOwner) {
+            var buyerCopy = watermarkClient.findBuyerCopy(courseId, userId);
+            if (buyerCopy.isPresent()) {
+                return new ByteArrayResource(buyerCopy.get());
+            }
+            log.warn("[Course] 구매자 사본이 아직 없습니다. 원본으로 폴백 courseId={} buyerId={}",
+                    courseId, userId);
+        }
+
+        return fileStorageService.load(course.getOriginalUrl());
+    }
+
+    /**
+     * 서비스 간 호출용 원본 로드.
+     *
+     * 사용자 권한 검사를 하지 않는다. internal 경로로만 노출되며
+     * 게이트웨이 라우팅에 포함되지 않아 외부에서는 접근할 수 없다.
+     */
+    public Resource loadOriginalInternal(Long courseId) {
+        Course course = findCourseById(courseId);
+
+        if (course.getOriginalUrl() == null || course.getOriginalUrl().isBlank()) {
+            throw new AssetNotFoundException("등록된 이미지가 없습니다: " + courseId);
+        }
         return fileStorageService.load(course.getOriginalUrl());
     }
 
@@ -156,9 +185,12 @@ public class CourseService {
      */
     public CourseDto.WatermarkVerifyResponse verifyAsset(MultipartFile file) {
         byte[] bytes = fileStorageService.readUpload(file);
-        WatermarkService.ExtractResult extracted = watermarkService.extract(bytes);
 
-        if (!extracted.found()) {
+        // 추출은 watermark-service 가 수행한다. 이 서비스는 결과를 디자인 정보와 대조만 한다.
+        Map<String, Object> trace = watermarkClient.trace(bytes);
+
+        boolean found = Boolean.TRUE.equals(trace.get("watermarkFound"));
+        if (!found) {
             return CourseDto.WatermarkVerifyResponse.builder()
                     .watermarkFound(false)
                     .registered(false)
@@ -166,54 +198,34 @@ public class CourseService {
                     .build();
         }
 
-        Course course = courseRepository.findById(extracted.courseId()).orElse(null);
-
-        if (course == null) {
-            return CourseDto.WatermarkVerifyResponse.builder()
-                    .watermarkFound(true)
-                    .registered(false)
-                    .designId(extracted.courseId())
-                    .ownerId(extracted.ownerId())
-                    .issuedAt(toLocalDateTime(extracted))
-                    .message("워터마크는 발견됐으나 해당 디자인이 더 이상 존재하지 않습니다.")
-                    .build();
-        }
-
-        String uploadedChecksum = watermarkService.sha256(bytes);
-        boolean checksumMatched = uploadedChecksum.equals(course.getAssetChecksum());
+        Long designId = asLong(trace.get("courseId"));
+        Course course = designId == null ? null : courseRepository.findById(designId).orElse(null);
 
         return CourseDto.WatermarkVerifyResponse.builder()
                 .watermarkFound(true)
-                .registered(true)
-                .designId(course.getId())
-                .ownerId(extracted.ownerId())
-                .issuedAt(toLocalDateTime(extracted))
-                .checksumMatched(checksumMatched)
-                .message(checksumMatched
-                        ? "원본과 일치하는 파일입니다."
-                        : "워터마크는 일치하나 파일이 재가공되었습니다.")
+                .registered(course != null)
+                .designId(designId)
+                .ownerId(asLong(trace.get("ownerId")))
+                .checksumMatched(Boolean.TRUE.equals(trace.get("checksumMatched")))
+                .message(course == null
+                        ? "워터마크는 발견됐으나 해당 디자인이 더 이상 존재하지 않습니다."
+                        : String.valueOf(trace.getOrDefault("message", "")))
                 .build();
     }
 
-    private LocalDateTime toLocalDateTime(WatermarkService.ExtractResult extracted) {
-        return extracted.issuedAt() == null
-                ? null
-                : LocalDateTime.ofInstant(extracted.issuedAt(), ZoneId.systemDefault());
+    private Long asLong(Object value) {
+        return value instanceof Number n ? n.longValue() : null;
     }
 
-    // ── 라이선스 등급 ──────────────────────────────────────
-
-    /**
-     * 디자인의 등급별 가격 목록 조회.
-     * 등급이 아직 등록되지 않았으면 빈 목록을 돌려준다 (에러 아님).
-     */
-    public List<CourseDto.LicenseTierResponse> getLicenseTiers(Long courseId) {
-        findCourseById(courseId);
-
-        return licenseTierRepository.findByCourseId(courseId).stream()
-                .map(CourseDto.LicenseTierResponse::from)
-                .collect(Collectors.toList());
+    private String sha256(byte[] data) {
+        try {
+            var digest = java.security.MessageDigest.getInstance("SHA-256");
+            return java.util.HexFormat.of().formatHex(digest.digest(data));
+        } catch (Exception e) {
+            throw new IllegalStateException("체크섬 계산에 실패했습니다.", e);
+        }
     }
+
 
     // ── 판매 대시보드 ──────────────────────────────────────
 

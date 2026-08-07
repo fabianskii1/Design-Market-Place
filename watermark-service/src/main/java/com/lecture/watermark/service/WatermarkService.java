@@ -1,4 +1,4 @@
-package com.lecture.course.service;
+package com.lecture.watermark.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -84,11 +84,19 @@ public class WatermarkService {
         return new WatermarkResult(originalBytes, previewBytes, payload, sha256(originalBytes));
     }
 
-    /** 추출 결과 */
-    public record ExtractResult(boolean found, String payload, Long courseId, Long ownerId, Instant issuedAt) {
+    /**
+     * 추출 결과.
+     *
+     * buyerId 는 구매자 사본에만 존재한다.
+     * null 이면 업로드 시점에 만들어진 원본/미리보기라는 뜻이며,
+     * 유출 경로를 특정할 수 없다.
+     */
+    public record ExtractResult(
+            boolean found, String payload,
+            Long courseId, Long ownerId, Long buyerId, Instant issuedAt) {
 
         public static ExtractResult notFound() {
-            return new ExtractResult(false, null, null, null, null);
+            return new ExtractResult(false, null, null, null, null, null);
         }
     }
 
@@ -102,24 +110,56 @@ public class WatermarkService {
                 return ExtractResult.notFound();
             }
 
-            // DMP1|{courseId}|{ownerId}|{epochSeconds}
+            // 업로드본  : DMP1|{courseId}|{ownerId}|{epochSeconds}
+            // 구매자본  : DMP1|{courseId}|{ownerId}|{buyerId}|{epochSeconds}
             String[] parts = payload.split("\\" + PAYLOAD_DELIMITER);
             if (parts.length < 4) {
                 return ExtractResult.notFound();
             }
+
+            boolean hasBuyer = parts.length >= 5;
 
             return new ExtractResult(
                     true,
                     payload,
                     Long.parseLong(parts[1]),
                     Long.parseLong(parts[2]),
-                    Instant.ofEpochSecond(Long.parseLong(parts[3]))
+                    hasBuyer ? Long.parseLong(parts[3]) : null,
+                    Instant.ofEpochSecond(Long.parseLong(hasBuyer ? parts[4] : parts[3]))
             );
         } catch (Exception e) {
             log.warn("[Watermark] 추출 실패: {}", e.getMessage());
             return ExtractResult.notFound();
         }
     }
+
+    /**
+     * 구매자 전용 사본을 만든다.
+     *
+     * 판매자 정보만 심긴 원본에 구매자 ID를 덧붙여 다시 심는다.
+     * 유출본을 발견했을 때 "누구에게 팔린 파일인지"를 특정하는 것이 목적이다.
+     * LSB 는 덮어쓰기이므로 기존 페이로드는 새 값으로 교체된다.
+     */
+    public BuyerCopyResult embedBuyer(byte[] originalBytes, Long courseId, Long ownerId, Long buyerId) {
+        BufferedImage source = toRgb(readImage(originalBytes));
+        validateSize(source);
+
+        String payload = String.join(PAYLOAD_DELIMITER,
+                PAYLOAD_VERSION,
+                String.valueOf(courseId),
+                String.valueOf(ownerId),
+                String.valueOf(buyerId),
+                String.valueOf(Instant.now().getEpochSecond()));
+
+        byte[] bytes = toPngBytes(embedInvisible(source, payload));
+
+        log.info("[Watermark] 구매자 사본 생성 courseId={} buyerId={} payload={} size={}B",
+                courseId, buyerId, payload, bytes.length);
+
+        return new BuyerCopyResult(bytes, payload, sha256(bytes));
+    }
+
+    public record BuyerCopyResult(byte[] bytes, String payload, String checksum) {}
 
     public String sha256(byte[] bytes) {
         try {
