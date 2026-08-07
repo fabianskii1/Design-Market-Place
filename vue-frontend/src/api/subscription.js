@@ -1,23 +1,31 @@
 import api from './index.js'
 
-// 구독 시 모든 라이선스 가격에 적용되는 할인율 (백엔드와 반드시 동일해야 함)
+/**
+ * 실제 백엔드(payment-service) 정책: 디자이너별 가격 설정이 아니라
+ * "구독 = 월 정액 9,900원, 전체 30% 할인" 고정 정책이다.
+ * (payment-service application.yml: subscription.monthly-price / subscription.discount-rate)
+ * 값을 바꿀 수 있는 API는 없고, 두 상수는 화면 표시용 추정치일 뿐이며
+ * 실제 계산과 청구는 항상 서버에서 이뤄진다.
+ */
+export const SUBSCRIPTION_MONTHLY_PRICE = 9900
 export const SUBSCRIPTION_DISCOUNT_RATE = 0.3
 
 export const subscriptionApi = {
-  getInstructorProfile(instructorId) {
-    return api.get(`/api/users/${instructorId}`)
+  // POST /api/subscriptions  body: { designerId }
+  subscribe(designerId) {
+    return api.post('/api/subscriptions', { designerId })
   },
-  setMySubscriptionPrice(monthlyPrice) {
-    return api.put('/api/users/me/subscription-price', { monthlyPrice })
+  // DELETE /api/subscriptions/{designerId}
+  cancel(designerId) {
+    return api.delete(`/api/subscriptions/${designerId}`)
   },
-  subscribe(instructorId) {
-    return api.post('/api/subscriptions', { instructorId })
-  },
+  // GET /api/subscriptions/my
   getMySubscriptions() {
-    return api.get('/api/subscriptions/me')
+    return api.get('/api/subscriptions/my')
   }
 }
 
+/** 화면 표시용 추정 할인가. 실제 할인은 구매 시점에 서버가 계산한다. */
 export function applyDiscount(price) {
   const value = Number(price ?? 0)
   if (Number.isNaN(value)) return 0

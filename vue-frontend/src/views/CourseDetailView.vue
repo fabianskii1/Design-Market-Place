@@ -48,29 +48,13 @@
 
               </div>
             </div>
-            <div v-if="instructorSubscriptionPrice && !isInstructor" class="subscribe-box">
+            <div v-if="!isInstructor" class="subscribe-box">
               <div v-if="isSubscribedToInstructor" class="subscribe-active">
                 ✅ 이 디자이너를 구독 중입니다 — 모든 작품 {{ Math.round(SUBSCRIPTION_DISCOUNT_RATE * 100) }}% 할인 적용
               </div>
               <template v-else-if="!justSubscribed">
                 <span class="subscribe-text">
-                  월 ₩{{ Number(instructorSubscriptionPrice).toLocaleString() }} 구독하면 이 디자이너의 모든 작품을
-                  {{ Math.round(SUBSCRIPTION_DISCOUNT_RATE * 100) }}% 할인된 가격에 구매할 수 있습니다.
-                </span>
-                <button type="button" class="btn btn-outline" :disabled="subscribing" @click="handleSubscribe">
-                  <span v-if="subscribing">구독 처리 중...</span>
-                  <span v-else>디자이너 구독하기</span>
-                </button>
-              </template>
-              <p v-if="subscribeMessage" class="subscribe-message">{{ subscribeMessage }}</p>
-            </div>
-            <div v-if="instructorSubscriptionPrice && !isInstructor" class="subscribe-box">
-              <div v-if="isSubscribedToInstructor" class="subscribe-active">
-                ✅ 이 디자이너를 구독 중입니다 — 모든 작품 {{ Math.round(SUBSCRIPTION_DISCOUNT_RATE * 100) }}% 할인 적용
-              </div>
-              <template v-else-if="!justSubscribed">
-                <span class="subscribe-text">
-                  월 ₩{{ Number(instructorSubscriptionPrice).toLocaleString() }} 구독하면 이 디자이너의 모든 작품을
+                  월 ₩{{ SUBSCRIPTION_MONTHLY_PRICE.toLocaleString() }} 구독하면 이 디자이너의 모든 작품을
                   {{ Math.round(SUBSCRIPTION_DISCOUNT_RATE * 100) }}% 할인된 가격에 구매할 수 있습니다.
                 </span>
                 <button type="button" class="btn btn-outline" :disabled="subscribing" @click="handleSubscribe">
@@ -98,7 +82,10 @@
 
             <div class="enroll-body">
               <div class="enroll-price-row">
-                <div class="enroll-price">₩{{ displayPrice }}</div>
+                <div class="enroll-price">
+                  <span v-if="displayOriginalPrice" class="enroll-price-original">₩{{ displayOriginalPrice }}</span>
+                  ₩{{ displayPrice }}
+                </div>
                 <span class="download-badge" :title="`다운로드 ${displayDownloadCount}회`">
                   <span aria-hidden="true">⬇</span> {{ displayDownloadCount }}
                 </span>
@@ -193,7 +180,7 @@ import { userApi } from '@/api/user.js'
 import { useAssetImage, invalidateAssetCache } from '@/composables/useAssetImage.js'
 import { useAuthStore } from '@/store/auth.js'
 import { LICENSE_TIERS, COMMON_CLAUSE } from '@/api/license.js'
-import { subscriptionApi, applyDiscount, SUBSCRIPTION_DISCOUNT_RATE } from '@/api/subscription.js'
+import { subscriptionApi, applyDiscount, SUBSCRIPTION_DISCOUNT_RATE, SUBSCRIPTION_MONTHLY_PRICE } from '@/api/subscription.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -259,7 +246,6 @@ const assetIsError = ref(false)
 const enrollmentStatus = ref('NONE') // NONE | PENDING | ACTIVE
 const licenseTiers = ref([])       // 백엔드에서 받은 { tier, price } 목록
 const selectedTier = ref('PERSONAL')
-const instructorSubscriptionPrice = ref(null)
 const isSubscribedToInstructor = ref(false)
 const subscribing = ref(false)
 const subscribeMessage = ref('')
@@ -455,24 +441,24 @@ async function loadLicenseTiers() {
   }
 }
 
+/**
+ * 구독은 디자이너별 가격 설정이 아니라 고정 정책(월 9,900원 / 30% 할인)이라
+ * 이 디자이너의 가격을 따로 조회할 필요가 없다. 내가 이 디자이너를 이미
+ * 구독 중인지만 /api/subscriptions/my 로 확인한다.
+ */
 async function loadInstructorSubscriptionInfo() {
-  const instructorId = course.value?.instructorId ?? course.value?.instructor_id
-  if (!instructorId) return
-
-  try {
-    const res = await subscriptionApi.getInstructorProfile(instructorId)
-    instructorSubscriptionPrice.value = res.data?.data?.subscriptionPrice ?? res.data?.subscriptionPrice ?? null
-  } catch (e) {
-    console.error('[CourseDetail] failed to load instructor subscription price:', e)
-    instructorSubscriptionPrice.value = null
+  const designerId = course.value?.instructorId ?? course.value?.instructor_id
+  if (!designerId || !auth.user?.id || isInstructor.value) {
+    isSubscribedToInstructor.value = false
+    return
   }
-
-  if (!auth.user?.id || isInstructor.value) return
 
   try {
     const res = await subscriptionApi.getMySubscriptions()
     const subs = Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : []
-    isSubscribedToInstructor.value = subs.some(s => Number(s.instructorId) === Number(instructorId) && (s.status ?? 'ACTIVE') === 'ACTIVE')
+    isSubscribedToInstructor.value = subs.some(
+      s => Number(s.designerId) === Number(designerId) && (s.status ?? 'ACTIVE') === 'ACTIVE'
+    )
   } catch (e) {
     console.error('[CourseDetail] failed to load my subscriptions:', e)
     isSubscribedToInstructor.value = false
@@ -593,10 +579,16 @@ async function handlePrimaryAction() {
     return
   }
 
+  const tierId = licenseTiers.value.find(t => t.tier === selectedTier.value)?.id
+  if (!tierId) {
+    enrollError.value = '이 라이선스 등급의 가격이 아직 등록되지 않았습니다. 다른 등급을 선택하거나 잠시 후 다시 시도해 주세요.'
+    return
+  }
+
   enrolling.value = true
 
   try {
-    await enrollmentApi.enroll(course.value.id, selectedTier.value)
+    await enrollmentApi.enroll(course.value.id, tierId)
     enrollmentStatus.value = 'PENDING'
   } catch (e) {
     console.error('[CourseDetail] enroll failed:', e)
