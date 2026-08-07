@@ -10,7 +10,7 @@
             <span class="badge" :class="badgeClass">{{ displayCategory }}</span>
             <h1 class="detail-title">{{ course.title }}</h1>
             <p class="detail-desc">
-              {{ course.description || '실무 전문가가 직접 설계한 커리큘럼으로 체계적으로 학습하세요.' }}
+              {{ course.description || '전문 디자이너의 작품입니다. 라이선스에 따라 자유롭게 활용하세요.' }}
             </p>
 
             <!-- 디자이너 연락처 -->
@@ -47,7 +47,7 @@
             </div>
           </div>
 
-          <!-- 우측 결제/수강 카드 -->
+          <!-- 우측 결제/구매 카드 -->
           <div class="enroll-card fade-in">
             <div class="enroll-thumb" :class="thumbBg">
               <div v-if="assetLoading" class="thumb-skeleton"></div>
@@ -365,6 +365,10 @@ async function handleDownload() {
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
+
+    // 서버가 다운로드 수를 올렸으므로 상세를 다시 받아 화면 숫자를 맞춘다.
+    // 실패해도 다운로드 자체는 이미 끝났으므로 조용히 넘어간다.
+    courseStore.fetchCourse(course.value.id).catch(() => {})
   } catch (e) {
     console.error('[CourseDetail] asset download failed:', e)
     assetIsError.value = true
@@ -392,9 +396,9 @@ const thumbSrc = computed(() => {
 
 const buttonLabel = computed(() => {
   if (isInstructor.value) return '디자이너 계정은 신청 불가'
-  if (enrollmentStatus.value === 'ACTIVE') return '내 수강 목록으로 이동'
+  if (enrollmentStatus.value === 'ACTIVE') return '내 구매 목록으로 이동'
   if (enrollmentStatus.value === 'PENDING') return '신청 완료 · 결제 처리 중'
-  return '결제하고 수강하기'
+  return '결제하고 구매하기'
 })
 
 const buttonDisabled = computed(() => {
@@ -406,15 +410,15 @@ const buttonDisabled = computed(() => {
 
 const helperText = computed(() => {
   if (isInstructor.value) {
-    return '디자이너 계정은 본인 디자인을 수강 신청할 수 없습니다.'
+    return '디자이너 계정은 본인 디자인을 구매할 수 없습니다.'
   }
 
   if (enrollmentStatus.value === 'ACTIVE') {
-    return '이미 수강 중인 디자인입니다. 내 수강 목록에서 바로 이어서 학습할 수 있습니다.'
+    return '이미 구매한 디자인입니다. 내 구매 목록에서 원본을 내려받을 수 있습니다.'
   }
 
   if (enrollmentStatus.value === 'PENDING') {
-    return '수강 신청이 접수되었습니다. 결제/처리 상태가 반영되면 내 수강 목록에서 확인할 수 있습니다.'
+    return '구매가 접수되었습니다. 결제 처리가 끝나면 내 구매 목록에서 확인할 수 있습니다.'
   }
 
   return '해당 창작물은 저작법에 보호를 받으며 무단 배포시 처벌 대상이 될 수 있습니다.'
@@ -459,7 +463,7 @@ async function handlePrimaryAction() {
   }
 
   if (isInstructor.value) {
-    enrollError.value = '디자이너 계정은 본인 디자인을 수강 신청할 수 없습니다.'
+    enrollError.value = '디자이너 계정은 본인 디자인을 구매할 수 없습니다.'
     return
   }
 
@@ -479,7 +483,7 @@ async function handlePrimaryAction() {
     enrollmentStatus.value = 'PENDING'
   } catch (e) {
     console.error('[CourseDetail] enroll failed:', e)
-    enrollError.value = e.response?.data?.message || '결제/수강 신청에 실패했습니다.'
+    enrollError.value = e.response?.data?.message || '결제·구매에 실패했습니다.'
   } finally {
     enrolling.value = false
   }

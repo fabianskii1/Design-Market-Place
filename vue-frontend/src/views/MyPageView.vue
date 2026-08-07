@@ -75,7 +75,7 @@
           </p>
         </section>
 
-        <!-- 강사 화면 -->
+        <!-- 디자이너 화면 -->
         <section v-else class="instructor-section">
           <div class="section-head">
             <h3 class="section-title">마이페이지</h3>
@@ -197,7 +197,7 @@ const recommendLoading = ref(true)
 const recommendError = ref('')
 const recommendMessage = ref('')
 
-/* 강사용 */
+/* 디자이너용 */
 const myCourses = ref([])
 const instructorLoading = ref(true)
 const instructorError = ref('')
@@ -222,7 +222,7 @@ function formatPrice(price) {
 }
 
 /**
- * course 객체에서 강사 식별자 추출
+ * course 객체에서 디자이너 식별자 추출
  */
 function getCourseInstructorId(course) {
   return (

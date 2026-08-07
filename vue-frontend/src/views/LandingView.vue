@@ -182,7 +182,7 @@ const features = [
   box-shadow: var(--shadow-lg);
 }
 
-/* 강의 섹션 */
+/* 디자인 섹션 */
 .popular-section { padding: 64px 0; }
 .section-inner { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 .section-header {

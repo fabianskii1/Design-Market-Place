@@ -230,6 +230,16 @@ public class CourseService {
     // ── 판매 대시보드 ──────────────────────────────────────
 
     /**
+     * 디자인별 라이선스 등급 목록 조회.
+     * 등록 API는 아직 없으므로 빈 목록이 정상이다.
+     */
+    public List<CourseDto.LicenseTierResponse> getLicenseTiers(Long courseId) {
+        return licenseTierRepository.findByCourseId(courseId).stream()
+                .map(CourseDto.LicenseTierResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * 디자이너 본인의 판매 실적.
      * 별도 집계 테이블 없이 실시간 쿼리로 처리한다.
      */
