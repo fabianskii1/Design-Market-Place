@@ -87,23 +87,6 @@ public class CourseServiceClient {
             throw new RuntimeException("Course Service 강의 상세 조회 실패");
         }
     }
-    //////////////////////////////////////////////////////////////////////////////////////
-    //////////////////////////////////////////////////////////////////////////////////////
-    /**
-     * Course Service: 강의 가격 조회 (수강신청 시 실제 결제 금액 산정용)
-     */
-    public java.math.BigDecimal getCoursePrice(Long courseId) {
-        Map<String, Object> course = getCourse(courseId);
-        Object priceObj = course.get("price");
-        if (priceObj == null) {
-            throw new RuntimeException("Course Service 응답에 price 필드가 없습니다. courseId: " + courseId);
-        }
-        return new java.math.BigDecimal(priceObj.toString());
-    }
-    //////////////////////////////////////////////////////////////////////////////////////
-    //////////////////////////////////////////////////////////////////////////////////////
-
-
     /**
      * Course Service: 수강생 수 증가 (수강 활성화 시 호출)
      */
@@ -122,4 +105,32 @@ public class CourseServiceClient {
                     courseId, e.getMessage());
         }
     }
+
+    public LicenseTierInfo getLicenseTier(Long courseId, Long licenseTierId) {
+        try {
+            LicenseTierInfo info = webClientBuilder.build()
+                    .get()
+                    .uri("http://course-service/api/courses/internal/{courseId}/license-tiers/{tierId}",
+                            courseId, licenseTierId)
+                    .retrieve()
+                    .bodyToMono(LicenseTierInfo.class)
+                    .block();
+            if (info == null) throw new RuntimeException("라이선스 등급 응답이 비어 있습니다.");
+            return info;
+        } catch (Exception e) {
+            log.error("[CourseServiceClient] 라이선스 등급 조회 실패 - courseId: {}, tierId: {}, error: {}",
+                    courseId, licenseTierId, e.getMessage());
+            throw new RuntimeException("Course Service 라이선스 등급 조회 실패");
+        }
+    }
+
+    @lombok.Getter
+    @lombok.NoArgsConstructor
+    public static class LicenseTierInfo {
+        private Long id;
+        private Long courseId;
+        private String tier;
+        private java.math.BigDecimal price;
+    }
+
 }

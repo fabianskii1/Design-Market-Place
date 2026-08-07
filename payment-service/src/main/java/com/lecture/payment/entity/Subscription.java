@@ -10,14 +10,16 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 구독 (기간제).
- *
- * 구매(Enrollment)와 분리한 이유: 구매는 한 번 성립하면 영구하지만
- * 구독은 기간·갱신·해지라는 상태 전이를 갖는다.
- * 한 테이블에 담으면 절반이 NULL 컬럼이 된다.
+ * 디자이너별 구독 (기간제, 1개월 고정).
+ * 구독자가 특정 디자이너를 구독하면 그 디자이너의 모든 디자인·모든 라이선스 등급에
+ * 30% 할인이 구매 시점에 적용된다. 할인율은 이 엔티티가 아니라
+ * SubscriptionService의 설정값(subscription.discount-rate)이 단일 진실 공급원이다.
  */
 @Entity
-@Table(name = "subscriptions")
+@Table(name = "subscriptions",
+       uniqueConstraints = @UniqueConstraint(
+               name = "uq_subscriber_designer",
+               columnNames = {"user_id", "designer_id"}))
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
@@ -30,15 +32,10 @@ public class Subscription {
     private Long id;
 
     @Column(name = "user_id", nullable = false)
-    private Long userId;
+    private Long userId; // 구독자
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "plan_code", nullable = false, length = 30)
-    private PlanCode planCode;
-
-    /** 구독 다운로드에 적용될 라이선스 등급 (license_tiers.id) */
-    @Column(name = "license_tier_id", nullable = false)
-    private Long licenseTierId;
+    @Column(name = "designer_id", nullable = false)
+    private Long designerId; // 구독 대상 디자이너 (courses.instructor_id)
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -48,10 +45,12 @@ public class Subscription {
     @Column(name = "monthly_price", nullable = false, precision = 10, scale = 2)
     private BigDecimal monthlyPrice;
 
+    // discount_rate는 컬럼으로 안 둔다. 일괄 30% 고정값이라 row마다 들고 있을 이유가 없고,
+    // 나중에 정책이 바뀌면 SubscriptionService의 상수/설정값 하나만 고치면 되게 한다.
+
     @Column(name = "started_at", nullable = false)
     private LocalDateTime startedAt;
 
-    /** 현재 주기 종료 시각. 이 시점 이후 갱신 또는 만료 처리된다. */
     @Column(name = "current_period_end", nullable = false)
     private LocalDateTime currentPeriodEnd;
 
@@ -69,39 +68,35 @@ public class Subscription {
     @LastModifiedDate
     private LocalDateTime updatedAt;
 
-    public enum PlanCode {
-        BASIC, PRO
+    public enum Status { ACTIVE, CANCELLED, EXPIRED }
+
+    public static Subscription start(Long userId, Long designerId, BigDecimal monthlyPrice) {
+        LocalDateTime now = LocalDateTime.now();
+        return Subscription.builder()
+                .userId(userId)
+                .designerId(designerId)
+                .monthlyPrice(monthlyPrice)
+                .startedAt(now)
+                .currentPeriodEnd(now.plusMonths(1))
+                .build();
     }
 
-    public enum Status {
-        ACTIVE,     // 구독 중
-        CANCELLED,  // 해지 예약 (주기 종료까지는 유효)
-        EXPIRED     // 만료
-    }
-
-    /**
-     * 지금 시점에 구독 혜택을 받을 수 있는지.
-     * 해지 예약(CANCELLED) 상태라도 현재 주기가 남아 있으면 혜택은 유지된다.
-     */
+    /** 해지 예약 상태여도 currentPeriodEnd 전이면 혜택은 유지 */
     public boolean isBenefitActive() {
-        return status != Status.EXPIRED
-                && currentPeriodEnd.isAfter(LocalDateTime.now());
+        return status != Status.EXPIRED && currentPeriodEnd.isAfter(LocalDateTime.now());
     }
 
-    /** 정기 결제 성공 시 다음 주기로 연장 */
-    public void renew(LocalDateTime nextPeriodEnd) {
-        this.currentPeriodEnd = nextPeriodEnd;
+    public void renew() {
+        this.currentPeriodEnd = this.currentPeriodEnd.plusMonths(1);
         this.status = Status.ACTIVE;
     }
 
-    /** 해지 예약 - 현재 주기까지는 유효하다 */
     public void cancel() {
         this.status = Status.CANCELLED;
         this.autoRenew = false;
         this.cancelledAt = LocalDateTime.now();
     }
 
-    /** 주기 종료 후 만료 처리 (스케줄러) */
     public void expire() {
         this.status = Status.EXPIRED;
         this.autoRenew = false;

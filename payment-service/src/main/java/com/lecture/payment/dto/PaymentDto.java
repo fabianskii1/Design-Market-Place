@@ -34,6 +34,8 @@ public class PaymentDto {
         private Long userId;
         private Long courseId;
         private BigDecimal amount;
+        private Long licenseTierId;
+        private String paymentType; // "ENROLLMENT" | "SUBSCRIPTION"
     }
 
     // 결제 응답
@@ -108,5 +110,31 @@ public class PaymentDto {
         private Long courseId;
         private Long salesCount;
         private BigDecimal totalRevenue;
+    }
+
+    // 강의별 월별 매출 (course-service internal 전용)
+    // yearMonth는 DB의 DATE_FORMAT(created_at, '%Y-%m')로 만들어진 값이라
+    // 이미 "YYYY-MM"(월 2자리, 0채움) 포맷이 보장된다. course-service에서 그대로 통과시키면 된다.
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class MonthlySales {
+        private Long courseId;
+        private String yearMonth;
+        private BigDecimal revenue;
+        private Long salesCount;
+    }
+
+    // 강의별 · 라이선스 등급별 판매 집계 (course-service internal 전용)
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class LicenseTierSales {
+        private Long courseId;
+        private Long licenseTierId;
+        private Long salesCount;
+        private BigDecimal revenue;
     }
 }

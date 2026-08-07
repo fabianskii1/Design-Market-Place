@@ -19,10 +19,10 @@ public class PaymentServiceClient {
     /**
      * Payment Service: 결제 요청 (동기 REST)
      */
-    public PaymentResult requestPayment(Long userId, Long courseId, BigDecimal amount) {
-        try {
-            PaymentRequest request = new PaymentRequest(userId, courseId, amount);
 
+    public PaymentResult requestPayment(Long userId, Long courseId, Long licenseTierId, BigDecimal amount) {
+        try {
+            PaymentRequest request = new PaymentRequest(userId, courseId, licenseTierId, amount, "ENROLLMENT");
             PaymentResult result = webClientBuilder.build()
                     .post()
                     .uri("http://payment-service:8084/api/payments/internal/request")
@@ -30,10 +30,8 @@ public class PaymentServiceClient {
                     .retrieve()
                     .bodyToMono(PaymentResult.class)
                     .block();
-
             log.info("[PaymentServiceClient] 결제 요청 완료 - userId: {}, courseId: {}, result: {}",
                     userId, courseId, result != null ? result.getStatus() : "null");
-
             return result;
         } catch (Exception e) {
             log.error("[PaymentServiceClient] 결제 요청 실패 - userId: {}, courseId: {}, error: {}",
@@ -47,12 +45,16 @@ public class PaymentServiceClient {
     static class PaymentRequest {
         private Long userId;
         private Long courseId;
+        private Long licenseTierId;
         private BigDecimal amount;
+        private String paymentType;
 
-        PaymentRequest(Long userId, Long courseId, BigDecimal amount) {
+        PaymentRequest(Long userId, Long courseId, Long licenseTierId, BigDecimal amount, String paymentType) {
             this.userId = userId;
             this.courseId = courseId;
+            this.licenseTierId = licenseTierId;
             this.amount = amount;
+            this.paymentType = paymentType;
         }
     }
 

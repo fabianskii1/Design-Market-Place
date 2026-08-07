@@ -176,4 +176,21 @@ public class CourseController {
                 CourseDto.ApiResponse.success(courseService.getMySales(instructorId))
         );
     }
+
+    @PostMapping("/{id}/license-tiers")
+    public ResponseEntity<CourseDto.ApiResponse<List<CourseDto.LicenseTierResponse>>> registerLicenseTiers(
+            @PathVariable Long id,
+            @Valid @RequestBody CourseDto.LicenseTierRegisterRequest request,
+            @RequestHeader("X-User-Id") Long instructorId) {
+
+        return ResponseEntity.ok(CourseDto.ApiResponse.success(
+                courseService.registerLicenseTiers(id, request, instructorId)));
+    }
+
+    /** 내부 호출: Enrollment Service가 구매 시점에 등급 가격 조회 */
+    @GetMapping("/internal/{courseId}/license-tiers/{tierId}")
+    public ResponseEntity<CourseDto.LicenseTierResponse> getLicenseTierInternal(
+            @PathVariable Long courseId, @PathVariable Long tierId) {
+        return ResponseEntity.ok(courseService.getLicenseTier(courseId, tierId));
+    }
 }

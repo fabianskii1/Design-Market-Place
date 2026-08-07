@@ -25,8 +25,18 @@ public class Payment {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(name = "course_id", nullable = false)
+    @Column(name = "course_id") // 기존 nullable = false 제거 (구독 결제는 courseId 없음)
     private Long courseId;
+
+    @Column(name = "license_tier_id")
+    private Long licenseTierId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_type", length = 20)
+    @Builder.Default
+    private PaymentType paymentType = PaymentType.ENROLLMENT;
+
+    public enum PaymentType { ENROLLMENT, SUBSCRIPTION }
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;

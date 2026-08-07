@@ -44,6 +44,10 @@ public class PaymentService {
                         .userId(request.getUserId())
                         .courseId(request.getCourseId())
                         .amount(request.getAmount())
+                        .licenseTierId(request.getLicenseTierId())
+                        .paymentType(request.getPaymentType() != null
+                                ? Payment.PaymentType.valueOf(request.getPaymentType())
+                                : Payment.PaymentType.ENROLLMENT)
                         .build()
         );
 
@@ -117,6 +121,40 @@ public class PaymentService {
                         .courseId(p.getCourseId())
                         .salesCount(p.getSalesCount())
                         .totalRevenue(p.getTotalRevenue())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 강의별 월별 매출 (course-service 판매 대시보드 - monthlyBreakdown용, internal)
+     */
+    public List<PaymentDto.MonthlySales> getMonthlySales(List<Long> courseIds) {
+        if (courseIds == null || courseIds.isEmpty()) {
+            return List.of();
+        }
+        return paymentRepository.findMonthlySalesByCourseIds(courseIds).stream()
+                .map(p -> PaymentDto.MonthlySales.builder()
+                        .courseId(p.getCourseId())
+                        .yearMonth(p.getYearMonth())
+                        .revenue(p.getRevenue())
+                        .salesCount(p.getSalesCount())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 강의별 · 라이선스 등급별 판매 집계 (course-service 판매 대시보드 - salesByLicense용, internal)
+     */
+    public List<PaymentDto.LicenseTierSales> getLicenseTierSales(List<Long> courseIds) {
+        if (courseIds == null || courseIds.isEmpty()) {
+            return List.of();
+        }
+        return paymentRepository.findLicenseTierSalesByCourseIds(courseIds).stream()
+                .map(p -> PaymentDto.LicenseTierSales.builder()
+                        .courseId(p.getCourseId())
+                        .licenseTierId(p.getLicenseTierId())
+                        .salesCount(p.getSalesCount())
+                        .revenue(p.getRevenue())
                         .build())
                 .collect(Collectors.toList());
     }
