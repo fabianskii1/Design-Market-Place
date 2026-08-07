@@ -36,8 +36,9 @@ public class SubscriptionService {
         if (userId.equals(designerId)) {
             throw new IllegalArgumentException("본인을 구독할 수 없습니다.");
         }
-        subscriptionRepository.findByUserIdAndDesignerId(userId, designerId)
-                .filter(Subscription::isBenefitActive)
+
+        var existing = subscriptionRepository.findByUserIdAndDesignerId(userId, designerId);
+        existing.filter(Subscription::isBenefitActive)
                 .ifPresent(s -> { throw new IllegalArgumentException("이미 구독 중인 디자이너입니다."); });
 
         Payment payment = paymentRepository.save(
@@ -49,8 +50,11 @@ public class SubscriptionService {
         );
         payment.complete(UUID.randomUUID().toString());
 
-        Subscription subscription = subscriptionRepository.save(
-                Subscription.start(userId, designerId, monthlyPrice));
+        // (user_id, designer_id) 유니크 제약이 있어서, 과거에 취소/만료된 row가 남아있으면
+        // 새로 insert하면 제약 위반(500)이 난다. 그 경우 기존 row를 재활성화한다.
+        Subscription subscription = existing
+                .map(s -> { s.resubscribe(monthlyPrice); return s; })
+                .orElseGet(() -> subscriptionRepository.save(Subscription.start(userId, designerId, monthlyPrice)));
 
         return SubscriptionDto.SubscriptionResponse.from(subscription);
     }

@@ -97,6 +97,21 @@ public class Subscription {
         this.cancelledAt = LocalDateTime.now();
     }
 
+    /**
+     * 취소/만료된 뒤 같은 디자이너를 다시 구독할 때 쓴다.
+     * (user_id, designer_id) 유니크 제약 때문에 새 row를 insert할 수 없어서,
+     * 기존 row를 재활성화하는 방식으로 처리한다.
+     */
+    public void resubscribe(BigDecimal monthlyPrice) {
+        LocalDateTime now = LocalDateTime.now();
+        this.status = Status.ACTIVE;
+        this.monthlyPrice = monthlyPrice;
+        this.startedAt = now;
+        this.currentPeriodEnd = now.plusMonths(1);
+        this.autoRenew = true;
+        this.cancelledAt = null;
+    }
+
     public void expire() {
         this.status = Status.EXPIRED;
         this.autoRenew = false;
