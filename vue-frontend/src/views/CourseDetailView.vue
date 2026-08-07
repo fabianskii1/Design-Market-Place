@@ -17,6 +17,22 @@
               <span>디자이너: {{ displayInstructorName }}</span>
               <span>수강생: {{ displayEnrollmentCount }}명</span>
             </div>
+            <div v-if="instructorSubscriptionPrice && !isInstructor" class="subscribe-box">
+              <div v-if="isSubscribedToInstructor" class="subscribe-active">
+                ✅ 이 디자이너를 구독 중입니다 — 모든 작품 {{ Math.round(SUBSCRIPTION_DISCOUNT_RATE * 100) }}% 할인 적용
+              </div>
+              <template v-else-if="!justSubscribed">
+                <span class="subscribe-text">
+                  월 ₩{{ Number(instructorSubscriptionPrice).toLocaleString() }} 구독하면 이 디자이너의 모든 작품을
+                  {{ Math.round(SUBSCRIPTION_DISCOUNT_RATE * 100) }}% 할인된 가격에 구매할 수 있습니다.
+                </span>
+                <button type="button" class="btn btn-outline" :disabled="subscribing" @click="handleSubscribe">
+                  <span v-if="subscribing">구독 처리 중...</span>
+                  <span v-else>디자이너 구독하기</span>
+                </button>
+              </template>
+              <p v-if="subscribeMessage" class="subscribe-message">{{ subscribeMessage }}</p>
+            </div>
           </div>
 
           <!-- 우측 결제/수강 카드 -->
@@ -34,7 +50,10 @@
             <p v-if="assetSrc" class="watermark-note">워터마크가 적용된 미리보기입니다.</p>
 
             <div class="enroll-body">
-              <div class="enroll-price">₩{{ displayPrice }}</div>
+              <div class="enroll-price">
+                <span v-if="displayOriginalPrice" class="enroll-price-original">₩{{ displayOriginalPrice }}</span>
+                ₩{{ displayPrice }}
+              </div>
               <div class="license-select">
                 <label
                   v-for="t in mergedTiers"
@@ -46,7 +65,10 @@
                   <div class="license-body">
                     <div class="license-top">
                       <span class="license-label">{{ t.label }}</span>
-                      <span class="license-price">₩{{ t.price.toLocaleString() }}</span>
+                      <span class="license-price">
+                        <span v-if="t.discounted" class="license-price-original">₩{{ t.originalPrice.toLocaleString() }}</span>
+                        ₩{{ t.price.toLocaleString() }}
+                      </span>
                     </div>
                     <p class="license-summary">{{ t.summary }}</p>
                   </div>
@@ -142,6 +164,7 @@ import { courseApi } from '@/api/course.js'
 import { useAssetImage, invalidateAssetCache } from '@/composables/useAssetImage.js'
 import { useAuthStore } from '@/store/auth.js'
 import { LICENSE_TIERS, COMMON_CLAUSE } from '@/api/license.js'
+import { subscriptionApi, applyDiscount, SUBSCRIPTION_DISCOUNT_RATE } from '@/api/subscription.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -161,14 +184,19 @@ const assetIsError = ref(false)
 const enrollmentStatus = ref('NONE') // NONE | PENDING | ACTIVE
 const licenseTiers = ref([])       // 백엔드에서 받은 { tier, price } 목록
 const selectedTier = ref('PERSONAL')
+const instructorSubscriptionPrice = ref(null)
+const isSubscribedToInstructor = ref(false)
+const subscribing = ref(false)
+const subscribeMessage = ref('')
+const justSubscribed = ref(false)
 
 const course = computed(() => courseStore.selectedCourse)
 const mergedTiers = computed(() => {
   return LICENSE_TIERS.map(meta => {
     const found = licenseTiers.value.find(t => t.tier === meta.tier)
-    // 백엔드에 아직 등급별 가격이 없으면 대표가(course.price)로 대체
-    const price = found?.price ?? course.value?.price ?? 0
-    return { ...meta, price }
+    const originalPrice = found?.price ?? course.value?.price ?? 0
+    const discounted = isSubscribedToInstructor.value ? applyDiscount(originalPrice) : originalPrice
+    return { ...meta, originalPrice, price: discounted, discounted: isSubscribedToInstructor.value }
   })
 })
 const selectedTierInfo = computed(() =>
@@ -214,6 +242,12 @@ const displayEnrollmentCount = computed(() => {
 const displayPrice = computed(() => {
   const value = Number(selectedTierInfo.value?.price ?? course.value?.price ?? 0)
   return Number.isNaN(value) ? '0' : value.toLocaleString()
+})
+
+const displayOriginalPrice = computed(() => {
+  if (!isSubscribedToInstructor.value) return null
+  const value = Number(selectedTierInfo.value?.originalPrice ?? 0)
+  return Number.isNaN(value) ? null : value.toLocaleString()
 })
 
 // 미리보기는 인증이 필요해 blob으로 받아온다 (CourseCard와 동일한 방식)
@@ -323,6 +357,51 @@ async function loadLicenseTiers() {
   } catch (e) {
     console.error('[CourseDetail] license tiers load failed:', e)
     licenseTiers.value = []
+  }
+}
+
+async function loadInstructorSubscriptionInfo() {
+  const instructorId = course.value?.instructorId ?? course.value?.instructor_id
+  if (!instructorId) return
+
+  try {
+    const res = await subscriptionApi.getInstructorProfile(instructorId)
+    instructorSubscriptionPrice.value = res.data?.data?.subscriptionPrice ?? res.data?.subscriptionPrice ?? null
+  } catch (e) {
+    console.error('[CourseDetail] failed to load instructor subscription price:', e)
+    instructorSubscriptionPrice.value = null
+  }
+
+  if (!auth.user?.id || isInstructor.value) return
+
+  try {
+    const res = await subscriptionApi.getMySubscriptions()
+    const subs = Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : []
+    isSubscribedToInstructor.value = subs.some(s => Number(s.instructorId) === Number(instructorId) && (s.status ?? 'ACTIVE') === 'ACTIVE')
+  } catch (e) {
+    console.error('[CourseDetail] failed to load my subscriptions:', e)
+    isSubscribedToInstructor.value = false
+  }
+}
+
+async function handleSubscribe() {
+  const instructorId = course.value?.instructorId ?? course.value?.instructor_id
+  if (!instructorId) return
+
+  subscribeMessage.value = ''
+  subscribing.value = true
+  try {
+    await subscriptionApi.subscribe(instructorId)
+    justSubscribed.value = true
+    subscribeMessage.value = '구독이 완료되었습니다. 할인된 가격을 보려면 새로고침 해주세요.'
+  } catch (e) {
+    console.error('[CourseDetail] subscribe failed:', e)
+    const status = e.response?.status
+    subscribeMessage.value = (status === 404 || status === 405)
+      ? '구독 API가 아직 준비되지 않았습니다.'
+      : (e.response?.data?.message || '구독에 실패했습니다.')
+  } finally {
+    subscribing.value = false
   }
 }
 
@@ -437,6 +516,7 @@ onMounted(async () => {
   await courseStore.fetchCourse(route.params.id)
   await loadEnrollmentStatus()
   await loadLicenseTiers()
+  await loadInstructorSubscriptionInfo()
 })
 
 
@@ -747,4 +827,11 @@ watch(
     grid-template-columns: 1fr;
   }
 }
+
+.subscribe-box { margin-top: 6px; padding: 14px 16px; border: 1px dashed var(--color-primary, #2d5bd7); border-radius: var(--radius-md, 10px); display: flex; flex-direction: column; gap: 10px; background: var(--color-primary-light, #eaf0ff); }
+.subscribe-text { font-size: 13px; color: var(--color-text-secondary); line-height: 1.6; }
+.subscribe-active { font-size: 13px; font-weight: 600; color: var(--color-primary); }
+.subscribe-message { font-size: 12px; color: var(--color-text-muted); }
+.enroll-price-original, .license-price-original { text-decoration: line-through; color: var(--color-text-muted, #8b93a3); font-weight: 400; margin-right: 6px; font-size: 0.75em; }
+
 </style>

@@ -93,6 +93,11 @@
               :class="{ active: activeTab === 'sales' }"
               @click="activeTab = 'sales'"
             >판매 현황</button>
+            <button
+              class="tab-btn"
+              :class="{ active: activeTab === 'subscription' }"
+              @click="activeTab = 'subscription'"
+            >구독 설정</button>
           </div>
 
           <template v-if="activeTab === 'courses'">
@@ -170,6 +175,39 @@
           </template>
 
           <SalesTab v-else-if="activeTab === 'sales'" />
+          <template v-else-if="activeTab === 'subscription'">
+            <div class="subscription-settings fade-in">
+              <p class="subscription-desc">
+                구독자는 이 가격을 매달 결제하고, 구독 기간 동안 내 모든 디자인을 라이선스 가격의
+                {{ Math.round(SUBSCRIPTION_DISCOUNT_RATE * 100) }}% 할인된 가격으로 구매할 수 있습니다.
+              </p>
+              <div class="subscription-form">
+                <input
+                  type="number"
+                  min="0"
+                  step="100"
+                  v-model="subscriptionPriceInput"
+                  class="subscription-input"
+                  placeholder="예: 9900"
+                />
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  :disabled="subscriptionSaving"
+                  @click="saveSubscriptionPrice"
+                >
+                  <span v-if="subscriptionSaving">저장 중...</span>
+                  <span v-else>저장</span>
+                </button>
+              </div>
+              <p v-if="subscriptionMessage" class="subscription-message" :class="{ 'is-error': subscriptionIsError }">
+                {{ subscriptionMessage }}
+              </p>
+              <p v-if="currentSubscriptionPrice !== null" class="subscription-current">
+                현재 설정된 구독 가격: {{ formatPrice(currentSubscriptionPrice) }} / 월
+              </p>
+            </div>
+          </template>
         </section>
       </main>
     </div>
@@ -186,6 +224,7 @@ import { enrollmentApi } from '@/api/enrollment.js'
 import { courseApi } from '@/api/course.js'
 import { categoryLabel } from '@/api/category.js'
 import SalesTab from '@/components/SalesTab.vue'
+import { subscriptionApi, SUBSCRIPTION_DISCOUNT_RATE } from '@/api/subscription.js'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -203,6 +242,11 @@ const myCourses = ref([])
 const instructorLoading = ref(true)
 const instructorError = ref('')
 const activeTab = ref('courses') // 'courses' | 'sales'
+const subscriptionPriceInput = ref('')
+const currentSubscriptionPrice = ref(null)
+const subscriptionSaving = ref(false)
+const subscriptionMessage = ref('')
+const subscriptionIsError = ref(false)
 
 const totalEnrollmentCount = computed(() =>
   myCourses.value.reduce((sum, course) => {
@@ -338,10 +382,51 @@ async function loadInstructorCourses() {
   }
 }
 
+async function loadMySubscriptionPrice() {
+  if (!auth.user?.id) return
+  try {
+    const res = await subscriptionApi.getInstructorProfile(auth.user.id)
+    const price = res.data?.data?.subscriptionPrice ?? res.data?.subscriptionPrice ?? null
+    currentSubscriptionPrice.value = price
+    subscriptionPriceInput.value = price ?? ''
+  } catch (e) {
+    console.error('[MyPage] failed to load subscription price:', e)
+  }
+}
+
+async function saveSubscriptionPrice() {
+  subscriptionMessage.value = ''
+  subscriptionIsError.value = false
+
+  const price = Number(subscriptionPriceInput.value)
+  if (!subscriptionPriceInput.value || Number.isNaN(price) || price < 0) {
+    subscriptionIsError.value = true
+    subscriptionMessage.value = '올바른 가격을 입력해 주세요.'
+    return
+  }
+
+  subscriptionSaving.value = true
+  try {
+    await subscriptionApi.setMySubscriptionPrice(price)
+    currentSubscriptionPrice.value = price
+    subscriptionMessage.value = '구독 가격이 저장되었습니다.'
+  } catch (e) {
+    console.error('[MyPage] failed to save subscription price:', e)
+    const status = e.response?.status
+    subscriptionIsError.value = true
+    subscriptionMessage.value = (status === 404 || status === 405)
+      ? '구독 가격 설정 API가 아직 준비되지 않았습니다.'
+      : (e.response?.data?.message || '저장에 실패했습니다.')
+  } finally {
+    subscriptionSaving.value = false
+  }
+}
+
 onMounted(async () => {
   if (isInstructor.value) {
     recommendLoading.value = false
     await loadInstructorCourses()
+    await loadMySubscriptionPrice()
   } else {
     instructorLoading.value = false
     await loadStudentRecommendations()
@@ -762,4 +847,13 @@ onMounted(async () => {
     grid-template-columns: 1fr;
   }
 }
+
+.subscription-settings { display: flex; flex-direction: column; gap: 14px; max-width: 420px; }
+.subscription-desc { font-size: 13px; color: var(--color-text-secondary); line-height: 1.6; }
+.subscription-form { display: flex; gap: 10px; align-items: center; }
+.subscription-input { flex: 1; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 14px; }
+.subscription-message { font-size: 13px; color: var(--color-primary); }
+.subscription-message.is-error { color: #dc2626; }
+.subscription-current { font-size: 13px; color: var(--color-text-muted); }
+
 </style>
