@@ -10,12 +10,43 @@
             <span class="badge" :class="badgeClass">{{ displayCategory }}</span>
             <h1 class="detail-title">{{ course.title }}</h1>
             <p class="detail-desc">
-              {{ course.description || '실무 전문가가 직접 설계한 커리큘럼으로 체계적으로 학습하세요.' }}
+              {{ course.description || '전문 디자이너의 작품입니다. 라이선스에 따라 자유롭게 활용하세요.' }}
             </p>
 
-            <div class="detail-meta">
-              <span>디자이너: {{ displayInstructorName }}</span>
-              <span>수강생: {{ displayEnrollmentCount }}명</span>
+            <!-- 디자이너 연락처 -->
+            <div class="designer-box">
+              <div class="designer-avatar">{{ designerInitial }}</div>
+
+              <div class="designer-info">
+                <div class="designer-label">디자이너</div>
+                <div class="designer-name">{{ displayInstructorName }}</div>
+
+                <a
+                  v-if="designerEmail"
+                  :href="`mailto:${designerEmail}`"
+                  class="designer-email"
+                  :title="designerEmail"
+                >
+                  ✉ {{ designerEmail }}
+                </a>
+                <div v-else-if="designerLoading" class="designer-email muted">
+                  연락처를 불러오는 중...
+                </div>
+                <div v-else class="designer-email muted">
+                  연락처가 등록되지 않았습니다
+                </div>
+              </div>
+
+              <div class="designer-actions">
+                <a
+                  v-if="designerEmail"
+                  :href="contactMailto"
+                  class="btn btn-outline designer-contact"
+                >
+                  문의하기
+                </a>
+
+              </div>
             </div>
             <div v-if="instructorSubscriptionPrice && !isInstructor" class="subscribe-box">
               <div v-if="isSubscribedToInstructor" class="subscribe-active">
@@ -35,7 +66,7 @@
             </div>
           </div>
 
-          <!-- 우측 결제/수강 카드 -->
+          <!-- 우측 결제/구매 카드 -->
           <div class="enroll-card fade-in">
             <div class="enroll-thumb" :class="thumbBg">
               <div v-if="assetLoading" class="thumb-skeleton"></div>
@@ -50,9 +81,14 @@
             <p v-if="assetSrc" class="watermark-note">워터마크가 적용된 미리보기입니다.</p>
 
             <div class="enroll-body">
-              <div class="enroll-price">
-                <span v-if="displayOriginalPrice" class="enroll-price-original">₩{{ displayOriginalPrice }}</span>
-                ₩{{ displayPrice }}
+              <div class="enroll-price-row">
+                <div class="enroll-price">
+                  <span v-if="displayOriginalPrice" class="enroll-price-original">₩{{ displayOriginalPrice }}</span>
+                  ₩{{ displayPrice }}
+                </div>
+                <span class="download-badge" :title="`다운로드 ${displayDownloadCount}회`">
+                  <span aria-hidden="true">⬇</span> {{ displayDownloadCount }}
+                </span>
               </div>
               <div class="license-select">
                 <label
@@ -75,7 +111,7 @@
                 </label>
                 <p class="license-common">{{ COMMON_CLAUSE }}</p>
               </div>
-             
+
               <button
                 class="btn btn-primary btn-full"
                 @click="handlePrimaryAction"
@@ -161,6 +197,7 @@ import AppHeader from '@/components/AppHeader.vue'
 import { useCourseStore } from '@/store/course.js'
 import { enrollmentApi } from '@/api/enrollment.js'
 import { courseApi } from '@/api/course.js'
+import { userApi } from '@/api/user.js'
 import { useAssetImage, invalidateAssetCache } from '@/composables/useAssetImage.js'
 import { useAuthStore } from '@/store/auth.js'
 import { LICENSE_TIERS, COMMON_CLAUSE } from '@/api/license.js'
@@ -173,6 +210,52 @@ const auth = useAuthStore()
 
 const enrolling = ref(false)
 const enrollError = ref('')
+
+// ── 디자이너 연락처 ──────────────────────────────
+// course 응답에 이름·이메일이 없어 instructorId 로 user-service 를 한 번 더 조회한다.
+// 백엔드가 CourseResponse 에 필드를 추가하면 아래 fetch 는 지워도 된다.
+const designer = ref(null)
+const designerLoading = ref(false)
+
+const designerEmail = computed(() =>
+  course.value?.designerEmail ?? course.value?.instructorEmail ?? designer.value?.email ?? ''
+)
+
+const designerInitial = computed(() => {
+  const name = displayInstructorName.value
+  return name && name !== '디자이너 정보 없음' ? name.charAt(0) : '?'
+})
+
+/** 제목을 미리 채운 문의 메일. 디자이너가 어떤 작업 문의인지 바로 알 수 있다. */
+const contactMailto = computed(() => {
+  if (!designerEmail.value) return ''
+  const subject = encodeURIComponent(`[DesignMarket] '${course.value?.title ?? ''}' 문의`)
+  const body = encodeURIComponent(
+    `안녕하세요.\n\n'${course.value?.title ?? ''}' 디자인에 대해 문의드립니다.\n\n`
+  )
+  return `mailto:${designerEmail.value}?subject=${subject}&body=${body}`
+})
+
+async function loadDesigner() {
+  designer.value = null
+
+  const designerId = course.value?.instructorId ?? course.value?.instructor_id
+  if (!designerId) return
+
+  // 백엔드가 이미 내려줬다면 추가 조회가 필요 없다
+  if (course.value?.designerEmail || course.value?.instructorEmail) return
+
+  designerLoading.value = true
+  try {
+    const res = await userApi.getById(designerId)
+    designer.value = res.data?.data ?? res.data ?? null
+  } catch (e) {
+    // 연락처를 못 불러와도 상세 화면 자체는 정상 동작해야 한다
+    console.warn('[CourseDetail] 디자이너 정보 조회 실패:', e)
+  } finally {
+    designerLoading.value = false
+  }
+}
 
 // ── 디자인 자산 (미리보기 · 업로드 · 다운로드) ──────────────
 const fileInput = ref(null)
@@ -221,6 +304,8 @@ const displayCategory = computed(() => course.value?.category || '-')
 
 const displayInstructorName = computed(() => {
   return (
+    designer.value?.name ||
+    course.value?.designerName ||
     course.value?.instructorName ||
     course.value?.teacherName ||
     course.value?.instructor?.name ||
@@ -237,6 +322,20 @@ const displayEnrollmentCount = computed(() => {
     0
   )
   return Number.isNaN(value) ? 0 : value.toLocaleString()
+})
+
+/**
+ * 다운로드 수. downloadCount 가 없으면 enrollmentCount 를 재활용한다.
+ * (구매 1건 = 다운로드 1회)
+ */
+const displayDownloadCount = computed(() => {
+  const value = Number(
+    course.value?.downloadCount ??
+    course.value?.enrollmentCount ??
+    course.value?.enrollment_count ??
+    0
+  )
+  return Number.isNaN(value) ? '0' : value.toLocaleString()
 })
 
 const displayPrice = computed(() => {
@@ -335,6 +434,10 @@ async function handleDownload() {
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
+
+    // 서버가 다운로드 수를 올렸으므로 상세를 다시 받아 화면 숫자를 맞춘다.
+    // 실패해도 다운로드 자체는 이미 끝났으므로 조용히 넘어간다.
+    courseStore.fetchCourse(course.value.id).catch(() => {})
   } catch (e) {
     console.error('[CourseDetail] asset download failed:', e)
     assetIsError.value = true
@@ -418,9 +521,9 @@ const thumbSrc = computed(() => {
 
 const buttonLabel = computed(() => {
   if (isInstructor.value) return '디자이너 계정은 신청 불가'
-  if (enrollmentStatus.value === 'ACTIVE') return '내 수강 목록으로 이동'
+  if (enrollmentStatus.value === 'ACTIVE') return '내 구매 목록으로 이동'
   if (enrollmentStatus.value === 'PENDING') return '신청 완료 · 결제 처리 중'
-  return '결제하고 수강하기'
+  return '결제하고 구매하기'
 })
 
 const buttonDisabled = computed(() => {
@@ -432,18 +535,18 @@ const buttonDisabled = computed(() => {
 
 const helperText = computed(() => {
   if (isInstructor.value) {
-    return '디자이너 계정은 본인 디자인을 수강 신청할 수 없습니다.'
+    return '디자이너 계정은 본인 디자인을 구매할 수 없습니다.'
   }
 
   if (enrollmentStatus.value === 'ACTIVE') {
-    return '이미 수강 중인 디자인입니다. 내 수강 목록에서 바로 이어서 학습할 수 있습니다.'
+    return '이미 구매한 디자인입니다. 내 구매 목록에서 원본을 내려받을 수 있습니다.'
   }
 
   if (enrollmentStatus.value === 'PENDING') {
-    return '수강 신청이 접수되었습니다. 결제/처리 상태가 반영되면 내 수강 목록에서 확인할 수 있습니다.'
+    return '구매가 접수되었습니다. 결제 처리가 끝나면 내 구매 목록에서 확인할 수 있습니다.'
   }
 
-  return '결제를 진행하면 수강 신청이 함께 처리됩니다.'
+  return '해당 창작물은 저작법에 보호를 받으며 무단 배포시 처벌 대상이 될 수 있습니다.'
 })
 
 async function loadEnrollmentStatus() {
@@ -485,7 +588,7 @@ async function handlePrimaryAction() {
   }
 
   if (isInstructor.value) {
-    enrollError.value = '디자이너 계정은 본인 디자인을 수강 신청할 수 없습니다.'
+    enrollError.value = '디자이너 계정은 본인 디자인을 구매할 수 없습니다.'
     return
   }
 
@@ -505,7 +608,7 @@ async function handlePrimaryAction() {
     enrollmentStatus.value = 'PENDING'
   } catch (e) {
     console.error('[CourseDetail] enroll failed:', e)
-    enrollError.value = e.response?.data?.message || '결제/수강 신청에 실패했습니다.'
+    enrollError.value = e.response?.data?.message || '결제·구매에 실패했습니다.'
   } finally {
     enrolling.value = false
   }
@@ -514,6 +617,7 @@ async function handlePrimaryAction() {
 
 onMounted(async () => {
   await courseStore.fetchCourse(route.params.id)
+  await loadDesigner()
   await loadEnrollmentStatus()
   await loadLicenseTiers()
   await loadInstructorSubscriptionInfo()
@@ -526,6 +630,7 @@ watch(
     console.log('[CourseDetail] selectedCourse changed =', value)
     if (value?.id) {
       assetMessage.value = ''
+      await loadDesigner()
       await loadEnrollmentStatus()
     }
   },
@@ -534,6 +639,101 @@ watch(
 </script>
 
 <style scoped>
+/* ── 다운로드 수 ───────────────────────────────── */
+.enroll-price-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.download-badge {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--color-text-muted, #8b93a3);
+  background: var(--color-bg-tertiary, #eef2fb);
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+/* ── 디자이너 연락처 ───────────────────────────── */
+.designer-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--color-border, #d7dbe3);
+  border-radius: var(--radius-md, 10px);
+  max-width: 480px;
+}
+
+.designer-avatar {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-primary, #2d5bd7);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.designer-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.designer-label {
+  font-size: 11px;
+  color: var(--color-text-muted, #8b93a3);
+  letter-spacing: 0.04em;
+}
+
+.designer-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary, #1e2430);
+  margin-top: 1px;
+}
+
+.designer-email {
+  display: block;
+  font-size: 12px;
+  color: var(--color-primary, #2d5bd7);
+  text-decoration: none;
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-email:hover {
+  text-decoration: underline;
+}
+
+.designer-email.muted {
+  color: var(--color-text-muted, #8b93a3);
+}
+
+.designer-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.designer-contact {
+  font-size: 13px;
+  padding: 7px 14px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
 /* ── 디자인 자산 ───────────────────────────────── */
 .asset-preview {
   width: 100%;

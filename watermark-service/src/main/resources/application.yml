@@ -1,0 +1,64 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: watermark-service
+
+  datasource:
+    url: jdbc:mariadb://lecturedb:3306/lecture_db
+    username: manager
+    password: SqlDba-1
+    driver-class-name: org.mariadb.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MariaDBDialect
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 12MB
+      max-request-size: 14MB
+
+  kafka:
+    bootstrap-servers: kafka:9092
+    consumer:
+      group-id: watermark-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.use.type.headers: false
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+# 구매 확정 이벤트
+kafka:
+  topic:
+    purchase-completed: purchase.completed
+
+# 원본 이미지를 가져올 대상
+service:
+  course-service:
+    url: http://course-service:8082
+
+# 구매자별 사본 저장 위치
+storage:
+  location: /app/watermarks
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html

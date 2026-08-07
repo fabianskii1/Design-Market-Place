@@ -31,6 +31,10 @@ export const courseApi = {
 
   // ── 디자인 자산 (이미지) ────────────────────────────────
 
+  /**
+   * 디자인 파일 업로드 (multipart, 필드명 file)
+   * 워터마크 삽입은 서버에서 처리한다.
+   */
   uploadAsset(designId, file, onProgress) {
     const formData = new FormData()
     formData.append('file', file)

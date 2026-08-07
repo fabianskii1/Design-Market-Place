@@ -30,7 +30,10 @@
         <span class="price">₩{{ Number(course.price).toLocaleString() }}</span>
       </div>
       <div class="card-footer">
-        <span class="enrolled">구매 {{ course.enrollmentCount?.toLocaleString() }}명</span>
+        <span class="downloads" :title="`다운로드 ${downloadCount.toLocaleString()}회`">
+          <span class="dl-icon" aria-hidden="true">⬇</span>
+          {{ downloadLabel }}
+        </span>
       </div>
     </div>
   </router-link>
@@ -50,6 +53,23 @@ const { src: assetSrc, loading: assetLoading } = useAssetImage(
   computed(() => props.course.id),
   computed(() => props.course.hasAsset)
 )
+
+/**
+ * 다운로드 수.
+ * 백엔드가 downloadCount 를 내려주면 그 값을, 아직이면 enrollmentCount 를 재활용한다.
+ * (구매 1건 = 다운로드 1회로 간주)
+ */
+const downloadCount = computed(() =>
+  Number(props.course.downloadCount ?? props.course.enrollmentCount ?? 0)
+)
+
+/** 1,000 이상은 1.2K 형태로 줄여 카드 레이아웃이 흔들리지 않게 한다 */
+const downloadLabel = computed(() => {
+  const n = downloadCount.value
+  if (n >= 10000) return `${Math.floor(n / 1000)}K`
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`
+  return n.toLocaleString()
+})
 
 const categoryConfig = {
   '로고 / 브랜딩': { bg: 'thumb-teal',   badge: 'badge-teal',   thumb: 'spring_boot' },
@@ -162,8 +182,16 @@ const thumbSrc = computed(() => {
 .card-footer {
   margin-top: 2px;
 }
-.enrolled {
+.downloads {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: 11px;
   color: var(--color-text-muted);
+}
+
+.dl-icon {
+  font-size: 10px;
+  opacity: 0.7;
 }
 </style>

@@ -1,1 +1,19 @@
+// Maven Central 레이트 리밋(429) 우회용 미러.
+// 플러그인 클래스패스는 settings.gradle 의 pluginManagement 에서 해석되므로
+// build.gradle 만 고쳐서는 'spring-boot-gradle-plugin 을 못 받는' 문제가 풀리지 않는다.
+pluginManagement {
+    repositories {
+        maven { url 'https://maven-central-asia.storage-download.googleapis.com/maven2/' }
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+dependencyResolutionManagement {
+    repositories {
+        maven { url 'https://maven-central-asia.storage-download.googleapis.com/maven2/' }
+        mavenCentral()
+    }
+}
+
 rootProject.name = 'course-service'

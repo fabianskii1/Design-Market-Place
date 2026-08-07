@@ -71,6 +71,8 @@ kafka:
   topic:
     payment-completed: payment.completed
     enrollment-completed: enrollment.completed
+    # 구매 확정 → watermark-service 가 구매자별 사본을 만든다
+    purchase-completed: purchase.completed
 
 springdoc:
   api-docs:
