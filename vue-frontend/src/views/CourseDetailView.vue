@@ -64,6 +64,22 @@
               </template>
               <p v-if="subscribeMessage" class="subscribe-message">{{ subscribeMessage }}</p>
             </div>
+            <div v-if="instructorSubscriptionPrice && !isInstructor" class="subscribe-box">
+              <div v-if="isSubscribedToInstructor" class="subscribe-active">
+                ✅ 이 디자이너를 구독 중입니다 — 모든 작품 {{ Math.round(SUBSCRIPTION_DISCOUNT_RATE * 100) }}% 할인 적용
+              </div>
+              <template v-else-if="!justSubscribed">
+                <span class="subscribe-text">
+                  월 ₩{{ Number(instructorSubscriptionPrice).toLocaleString() }} 구독하면 이 디자이너의 모든 작품을
+                  {{ Math.round(SUBSCRIPTION_DISCOUNT_RATE * 100) }}% 할인된 가격에 구매할 수 있습니다.
+                </span>
+                <button type="button" class="btn btn-outline" :disabled="subscribing" @click="handleSubscribe">
+                  <span v-if="subscribing">구독 처리 중...</span>
+                  <span v-else>디자이너 구독하기</span>
+                </button>
+              </template>
+              <p v-if="subscribeMessage" class="subscribe-message">{{ subscribeMessage }}</p>
+            </div>
           </div>
 
           <!-- 우측 결제/구매 카드 -->
@@ -82,34 +98,10 @@
 
             <div class="enroll-body">
               <div class="enroll-price-row">
-                <div class="enroll-price">
-                  <span v-if="displayOriginalPrice" class="enroll-price-original">₩{{ displayOriginalPrice }}</span>
-                  ₩{{ displayPrice }}
-                </div>
+                <div class="enroll-price">₩{{ displayPrice }}</div>
                 <span class="download-badge" :title="`다운로드 ${displayDownloadCount}회`">
                   <span aria-hidden="true">⬇</span> {{ displayDownloadCount }}
                 </span>
-              </div>
-              <div class="license-select">
-                <label
-                  v-for="t in mergedTiers"
-                  :key="t.tier"
-                  class="license-option"
-                  :class="{ active: selectedTier === t.tier }"
-                >
-                  <input type="radio" v-model="selectedTier" :value="t.tier" class="license-radio" />
-                  <div class="license-body">
-                    <div class="license-top">
-                      <span class="license-label">{{ t.label }}</span>
-                      <span class="license-price">
-                        <span v-if="t.discounted" class="license-price-original">₩{{ t.originalPrice.toLocaleString() }}</span>
-                        ₩{{ t.price.toLocaleString() }}
-                      </span>
-                    </div>
-                    <p class="license-summary">{{ t.summary }}</p>
-                  </div>
-                </label>
-                <p class="license-common">{{ COMMON_CLAUSE }}</p>
               </div>
 
               <button
@@ -618,6 +610,7 @@ async function handlePrimaryAction() {
 onMounted(async () => {
   await courseStore.fetchCourse(route.params.id)
   await loadDesigner()
+  console.log('[CourseDetail] selectedCourse =', courseStore.selectedCourse)
   await loadEnrollmentStatus()
   await loadLicenseTiers()
   await loadInstructorSubscriptionInfo()
