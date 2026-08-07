@@ -132,12 +132,12 @@
                 rows="6"
                 placeholder="디자인 소개, 디자인 특징 등을 입력해 주세요."
               ></textarea>
-              </div>
+            </div>
+
             <div class="form-section">
               <h3 class="form-section-title">카테고리 및 라이선스</h3>
 
-              <div class="form-row">
-                <div class="form-group">
+              <div class="form-group">
                 <label class="form-label" for="category">카테고리</label>
                 <select id="category" v-model="form.category" class="form-select">
                   <option disabled value="">카테고리를 선택하세요</option>
@@ -149,20 +149,6 @@
                     {{ option.label }}
                   </option>
                 </select>
-              </div>
-
-                <div class="form-group">
-                  <label class="form-label" for="price">가격</label>
-                  <input
-                    id="price"
-                    v-model.number="form.price"
-                    type="number"
-                    min="0"
-                    step="1000"
-                    class="form-input"
-                    placeholder="예: 50000"
-                  />
-                </div>
               </div>
 
               <div class="form-group">
@@ -194,7 +180,6 @@
             </div>
 
             <div v-if="validationError" class="error-box">
-        
               {{ validationError }}
             </div>
 
