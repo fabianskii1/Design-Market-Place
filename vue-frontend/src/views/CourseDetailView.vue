@@ -37,13 +37,24 @@
                 </div>
               </div>
 
-              <a
-                v-if="designerEmail"
-                :href="contactMailto"
-                class="btn btn-outline designer-contact"
-              >
-                문의하기
-              </a>
+              <div class="designer-actions">
+                <a
+                  v-if="designerEmail"
+                  :href="contactMailto"
+                  class="btn btn-outline designer-contact"
+                >
+                  문의하기
+                </a>
+
+                <!-- 구독 기능은 별도 담당자가 구현 예정. 지금은 진입점만 둔다. -->
+                <button
+                  type="button"
+                  class="btn btn-primary designer-contact"
+                  @click="handleSubscribe"
+                >
+                  구독하기
+                </button>
+              </div>
             </div>
           </div>
 
@@ -190,6 +201,16 @@ const contactMailto = computed(() => {
   )
   return `mailto:${designerEmail.value}?subject=${subject}&body=${body}`
 })
+
+/**
+ * 구독 진입점.
+ * 구독 화면·API는 다른 담당자가 구현 중이라, 준비되면 라우팅으로 교체한다.
+ * (예: router.push('/subscription'))
+ */
+function handleSubscribe() {
+  assetIsError.value = false
+  assetMessage.value = '구독 기능은 준비 중입니다.'
+}
 
 async function loadDesigner() {
   designer.value = null
@@ -593,8 +614,13 @@ watch(
   color: var(--color-text-muted, #8b93a3);
 }
 
-.designer-contact {
+.designer-actions {
+  display: flex;
   flex-shrink: 0;
+  gap: 8px;
+}
+
+.designer-contact {
   font-size: 13px;
   padding: 7px 14px;
   text-decoration: none;
